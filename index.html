@@ -1,0 +1,2011 @@
+
+<!DOCTYPE html>
+<html lang="es" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dan Music Anywhere | Domina la Música Desde Cualquier Lugar</title>
+    
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Phosphor Icons (Iconos premium) -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <!-- Tailwind CSS (CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        premium: { white: '#FAFAFA', beige: '#0D0D0D', gold: '#D4AF37' },
+                        medical: { blue: '#1A1A2E', light: '#1A4BFF' },
+                        sage: { light: '#1F1235', DEFAULT: '#D4AF37', dark: '#FFB800' }
+                    },
+                    boxShadow: {
+                        'soft': '0 10px 40px -10px rgba(0,0,0,0.05)',
+                        'glass': '0 8px 32px 0 rgba(31, 38, 135, 0.07)',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Supabase JS (Base de datos y Auth) -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <!-- Alpine.js (Interactividad) -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+    <style>
+        html { scroll-behavior: smooth; }
+        body { font-family: 'Inter', sans-serif; background-color: #0D0D0D; }
+        [x-cloak] { display: none !important; }
+        /* Scrollbar invisible para los mockups móviles */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body x-data="danMusicApp()" class="text-slate-200 antialiased selection:bg-medical-light selection:text-white">
+
+    <!-- ==========================================
+         BARRA DE SUPERVISIÓN ADMIN
+         ========================================== -->
+    <div x-show="userRole === 'admin'" class="bg-slate-900 text-white p-3 text-sm flex flex-wrap justify-center gap-2 md:gap-4 shadow-md relative z-50 sticky top-0" x-cloak>
+        <span class="opacity-50 mr-2 hidden md:inline flex items-center"><i class="ph-fill ph-shield-check mr-1"></i> Modo Supervisión (Admin):</span>
+        <button @click="view = 'admin'" :class="view === 'admin' ? 'bg-medical-light' : 'bg-slate-700'" class="px-4 py-1.5 rounded-full transition font-medium">CRM Admin</button>
+        <button @click="view = 'student'" :class="view === 'student' ? 'bg-medical-light' : 'bg-slate-700'" class="px-4 py-1.5 rounded-full transition font-medium">Portal Alumno</button>
+        <button @click="view = 'teacher'" :class="view === 'teacher' ? 'bg-medical-light' : 'bg-slate-700'" class="px-4 py-1.5 rounded-full transition font-medium">App Profesor</button>
+    </div>
+
+    <!-- ==========================================
+         MODALES GLOBALES DE AUTENTICACIÓN
+         ========================================== -->
+    
+    <!-- Modal Login Global -->
+    <div x-show="showLoginModal" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-md" x-cloak>
+        <div class="bg-white p-8 rounded-3xl shadow-2xl border border-slate-100 w-full max-w-md" @click.away="showLoginModal = false">
+            <div class="flex items-center gap-2 mb-6 justify-center">
+                <i class="ph-fill ph-music-notes text-premium-gold text-3xl"></i>
+                <h2 class="text-2xl font-bold text-medical-blue">Accede a tu Portal Musical</h2>
+            </div>
+            <p class="text-center text-sm text-slate-500 mb-6">Ingresa tus credenciales para continuar.</p>
+            <form @submit.prevent="login" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Correo Electrónico</label>
+                    <input type="email" x-model="loginEmail" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-medical-light" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Contraseña</label>
+                    <input type="password" x-model="loginPassword" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-medical-light" required>
+                </div>
+                <p x-show="loginError" x-text="loginError" class="text-red-500 text-xs font-medium text-center"></p>
+                <div class="flex gap-3 pt-2">
+                    <button type="button" @click="showLoginModal = false" class="flex-1 bg-slate-100 text-slate-700 py-3 rounded-xl font-semibold hover:bg-slate-200 transition" :disabled="loginLoading">Cancelar</button>
+                    <button type="submit" class="flex-1 bg-medical-blue text-white py-3 rounded-xl font-semibold shadow-soft hover:bg-blue-900 transition flex justify-center items-center gap-2" :disabled="loginLoading">
+                        <span x-show="!loginLoading">Ingresar</span>
+                        <span x-show="loginLoading" class="animate-pulse">Verificando...</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Registro Global -->
+    <div x-show="showRegisterModal" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-md" x-cloak>
+        <div class="bg-white p-8 rounded-3xl shadow-2xl border border-slate-100 w-full max-w-md" @click.away="showRegisterModal = false">
+            <div class="flex items-center gap-2 mb-6 justify-center">
+                <i class="ph-fill ph-headphones text-premium-gold text-3xl"></i>
+                <h2 class="text-2xl font-bold text-medical-blue">Únete a Dan Music Anywhere</h2>
+            </div>
+            <form @submit.prevent="registerUser" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Nombre Completo</label>
+                    <input type="text" x-model="registerData.nombre" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-medical-light" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Correo Electrónico</label>
+                    <input type="email" x-model="registerData.email" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-medical-light" required>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Contraseña</label>
+                        <input type="password" x-model="registerData.password" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-medical-light" required minlength="6">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Confirmar</label>
+                        <input type="password" x-model="registerData.confirmPassword" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-medical-light" required minlength="6">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Tipo de Usuario</label>
+                    <select x-model="registerData.role" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-medical-light" required>
+                        <option value="student">Alumno (Busco clases)</option>
+                        <option value="teacher">Profesor (Ofrezco clases)</option>
+                    </select>
+                </div>
+                <p x-show="registerError" x-text="registerError" class="text-red-500 text-xs font-medium text-center"></p>
+                <div class="flex gap-3 pt-2">
+                    <button type="button" @click="showRegisterModal = false" class="flex-1 bg-slate-100 text-slate-700 py-3 rounded-xl font-semibold hover:bg-slate-200 transition" :disabled="registerLoading">Cancelar</button>
+                    <button type="submit" class="flex-1 bg-medical-blue text-white py-3 rounded-xl font-semibold shadow-soft hover:bg-blue-900 transition flex justify-center items-center gap-2" :disabled="registerLoading">
+                        <span x-show="!registerLoading">Registrarse</span>
+                        <span x-show="registerLoading" class="animate-pulse">Creando...</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ==========================================
+         VISTA 1: LANDING PAGE PREMIUM
+         ========================================== -->
+    <div x-show="view === 'landing'" x-transition.opacity.duration.500ms x-cloak class="min-h-screen bg-premium-beige">
+        <!-- Barra de Navegación -->
+        <nav class="w-full px-6 py-6 flex justify-between items-center max-w-7xl mx-auto">
+            <div class="text-2xl font-bold text-white flex items-center gap-2">
+                <i class="ph-fill ph-music-notes text-premium-gold text-3xl"></i> Dan Music Anywhere
+            </div>
+            <div class="hidden md:flex items-center space-x-8">
+                <a href="#servicios" class="text-slate-300 hover:text-white transition font-medium">Programas</a>
+                <a href="#nosotros" class="text-slate-300 hover:text-white transition font-medium">Nosotros</a>
+                
+                <!-- Botones de Autenticación Reales -->
+                <button x-show="!isAuthenticated" @click="showLoginModal = true" class="text-white font-semibold hover:text-medical-light transition">Iniciar Sesión</button>
+                <button x-show="!isAuthenticated" @click="showRegisterModal = true" class="bg-medical-light text-white px-6 py-2.5 rounded-full shadow-soft hover:bg-blue-700 transition font-medium">
+                    Únete Ahora
+                </button>
+                
+                <!-- Botón de retorno si ya está logueado -->
+                <button x-show="isAuthenticated" @click="view = userRole === 'admin' ? 'admin' : (userRole === 'teacher' ? (teacherStatus === 'pendiente' ? 'teacher_pending' : (teacherStatus === 'rechazado' || teacherStatus === 'inactivo' ? 'teacher_rejected' : 'teacher')) : 'student')" class="bg-medical-light text-white px-6 py-2.5 rounded-full shadow-soft hover:bg-blue-700 transition font-medium flex items-center gap-2">
+                    Ir al Portal <i class="ph ph-arrow-right"></i>
+                </button>
+            </div>
+        </nav>
+
+        <!-- Sección Hero -->
+        <main class="max-w-7xl mx-auto px-6 pt-16 pb-24 flex flex-col lg:flex-row items-center gap-16">
+            <div class="flex-1 space-y-8">
+                <div class="inline-flex items-center gap-2 bg-white/5 px-4 py-2 rounded-full shadow-sm border border-white/10 backdrop-blur-md">
+                    <span class="w-2 h-2 rounded-full bg-medical-light animate-pulse"></span>
+                    <span class="text-sm font-medium text-slate-200">Educación Musical Premium</span>
+                </div>
+                
+                <h1 class="text-5xl lg:text-7xl font-extrabold leading-[1.1] text-white tracking-tight">
+                    Domina la Música <br/>
+                    <span class="text-medical-light">Desde Cualquier Lugar.</span>
+                </h1>
+                
+                <p class="text-xl text-slate-400 max-w-lg leading-relaxed font-light">
+                    Clases de música privadas en tu hogar, en línea o directamente en nuestro estudio profesional. Aprendizaje personalizado diseñado para tu ritmo, objetivos y pasión.
+                </p>
+                
+                <div class="flex flex-col sm:flex-row gap-4 pt-4">
+                    <button @click="showLeadModal = true" class="bg-medical-light text-white px-8 py-4 rounded-full font-semibold shadow-soft hover:bg-blue-700 transition flex items-center justify-center gap-2">
+                        Reserva tu Primera Clase <i class="ph ph-arrow-right text-xl"></i>
+                    </button>
+                    <button @click="openWhatsApp('Hola, quiero reservar una clase en Dan Music Anywhere.')" class="bg-white/10 text-white border border-white/20 px-8 py-4 rounded-full font-semibold shadow-sm hover:bg-white/20 transition flex items-center justify-center gap-2 backdrop-blur-sm">
+                        <i class="ph ph-whatsapp-logo text-xl text-green-400"></i> Habla con un Instructor
+                    </button>
+                </div>
+            </div>
+
+            <!-- Visual Hero (Glassmorphism) -->
+            <div class="w-full lg:flex-1 h-[500px] lg:h-[600px] relative rounded-[2.5rem] overflow-hidden shadow-2xl border border-white/10">
+                <div class="absolute inset-0">
+                    <img
+                        src="https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?q=80&w=2070&auto=format&fit=crop"
+                        alt="Music Studio"
+                        class="w-full h-full object-cover"
+                    >
+                </div>
+                <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
+                
+                <!-- Tarjeta UI Flotante -->
+                <div class="absolute bottom-4 left-4 right-4 md:bottom-8 md:left-8 md:right-8 bg-black/80 backdrop-blur-xl p-4 md:p-6 rounded-3xl border border-white/20 shadow-glass transform hover:-translate-y-2 transition duration-500">
+                    <div class="flex items-center gap-3 md:gap-4 mb-2 md:mb-3 border-b border-white/10 pb-2 md:pb-3">
+                        <div class="bg-medical-light/20 p-2 md:p-3 rounded-full text-medical-light">
+                            <i class="ph-fill ph-star text-xl md:text-2xl"></i>
+                        </div>
+                        <div>
+                            <p class="font-bold text-sm md:text-base text-white">Instructores de Clase Mundial</p>
+                            <p class="text-[10px] md:text-xs text-medical-light font-medium">Aprende de profesionales de la industria</p>
+                        </div>
+                    </div>
+                    <p class="text-xs md:text-sm text-slate-300 leading-relaxed">
+                        Nuestra facultad está formada por músicos y educadores profesionales rigurosamente seleccionados, comprometidos con tu crecimiento técnico, teórico y artístico en cada sesión.
+                    </p>
+                </div>
+            </div>
+        </main>
+
+        <!-- Sección Servicios -->
+        <section id="servicios" class="py-24 bg-black border-t border-white/5">
+            <div class="max-w-7xl mx-auto px-6">
+                <div class="text-center mb-16">
+                    <h2 class="text-3xl md:text-4xl font-bold text-white mb-4">Nuestros Programas</h2>
+                    <p class="text-slate-400 max-w-2xl mx-auto">Experiencias educativas a medida diseñadas para elevar tu viaje musical.</p>
+                </div>
+                <div class="grid md:grid-cols-3 gap-8">
+                    <div class="bg-white/5 p-8 rounded-3xl border border-white/10 hover:bg-white/10 transition backdrop-blur-sm">
+                        <div class="w-14 h-14 bg-medical-light/20 text-medical-light rounded-2xl flex items-center justify-center mb-6">
+                            <i class="ph-fill ph-house text-3xl"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-white mb-3">Clases a Domicilio</h3>
+                        <p class="text-slate-400 text-sm leading-relaxed">Instrucción privada premium en la comodidad de tu hogar. Plan de estudios personalizado para todas las edades y niveles.</p>
+                    </div>
+                    <div class="bg-white/5 p-8 rounded-3xl border border-white/10 hover:bg-white/10 transition backdrop-blur-sm">
+                        <div class="w-14 h-14 bg-sage-light text-premium-gold rounded-2xl flex items-center justify-center mb-6">
+                            <i class="ph-fill ph-broadcast text-3xl"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-white mb-3">Sesiones en Línea en Vivo</h3>
+                        <p class="text-slate-400 text-sm leading-relaxed">Clases virtuales de alta fidelidad con configuración multicámara. Conéctate con instructores de primer nivel desde cualquier parte del mundo.</p>
+                    </div>
+                    <div class="bg-white/5 p-8 rounded-3xl border border-white/10 hover:bg-white/10 transition backdrop-blur-sm">
+                        <div class="w-14 h-14 bg-white/10 text-white rounded-2xl flex items-center justify-center mb-6">
+                            <i class="ph-fill ph-speaker-hifi text-3xl"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-white mb-3">Experiencia en Estudio</h3>
+                        <p class="text-slate-400 text-sm leading-relaxed">Aprendizaje inmersivo en nuestros estudios de grabación profesionales de última generación. Perfecto para interpretación y producción avanzada.</p>
+                    </div>
+                    <div class="bg-white/5 p-8 rounded-3xl border border-white/10 hover:bg-white/10 transition backdrop-blur-sm">
+                        <div class="w-14 h-14 bg-medical-light/20 text-medical-light rounded-2xl flex items-center justify-center mb-6">
+                            <i class="ph-fill ph-microphone-stage text-3xl"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-white mb-3">Entrenamiento de Interpretación</h3>
+                        <p class="text-slate-400 text-sm leading-relaxed">Domina la presencia escénica, preparación para audiciones y técnicas de interpretación en vivo con veteranos de la industria.</p>
+                    </div>
+                    <div class="bg-white/5 p-8 rounded-3xl border border-white/10 hover:bg-white/10 transition backdrop-blur-sm">
+                        <div class="w-14 h-14 bg-sage-light text-premium-gold rounded-2xl flex items-center justify-center mb-6">
+                            <i class="ph-fill ph-music-notes-simple text-3xl"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-white mb-3">Teoría y Composición</h3>
+                        <p class="text-slate-400 text-sm leading-relaxed">Inmersión profunda en armonía, arreglos y composición. Desbloquea tu potencial creativo con bases teóricas estructuradas.</p>
+                    </div>
+                    <div class="bg-white/5 p-8 rounded-3xl border border-white/10 hover:bg-white/10 transition backdrop-blur-sm">
+                        <div class="w-14 h-14 bg-white/10 text-white rounded-2xl flex items-center justify-center mb-6">
+                            <i class="ph-fill ph-sliders text-3xl"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-white mb-3">Esenciales de Producción</h3>
+                        <p class="text-slate-400 text-sm leading-relaxed">Aprende mezcla, masterización y flujos de trabajo en DAW. Convierte tus ideas musicales en pistas de calidad profesional.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Sección Nosotros -->
+        <section id="nosotros" class="py-24 bg-premium-beige">
+            <div class="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center gap-16">
+                <div class="w-full md:flex-1">
+                    <div class="relative rounded-[2.5rem] overflow-hidden shadow-2xl h-[400px] border border-white/10">
+                        <div class="absolute inset-0">
+                            <img
+                                src="https://images.unsplash.com/photo-1552422535-c45813c61732?q=80&w=2070&auto=format&fit=crop"
+                                alt="Music Lesson"
+                                class="w-full h-full object-cover"
+                            >
+                        </div>
+                    </div>
+                </div>
+                <div class="flex-1 space-y-6">
+                    <h2 class="text-3xl md:text-4xl font-bold text-white">Por qué Dan Music Anywhere</h2>
+                    <p class="text-slate-400 leading-relaxed">
+                        Creemos que dominar un instrumento debe ser un viaje inspirador y personalizado. Combinamos instructores de clase mundial con tecnología de punta para ofrecer una experiencia de aprendizaje fluida.
+                    </p>
+                    <p class="text-slate-400 leading-relaxed">
+                        Ya seas un principiante descubriendo tu pasión o un músico avanzado perfeccionando tu arte, nuestra plataforma proporciona las herramientas, el seguimiento y la mentoría que necesitas para tener éxito.
+                    </p>
+                    <div class="pt-4">
+                        <button @click="showLeadModal = true" class="bg-medical-light text-white px-8 py-3 rounded-full font-semibold shadow-soft hover:bg-blue-700 transition">
+                            Comienza tu Viaje
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Modal Lead (Registro Público) -->
+        <div x-show="showLeadModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md" x-cloak>
+            <div class="bg-white p-8 rounded-3xl shadow-2xl border border-slate-100 w-full max-w-md" @click.away="showLeadModal = false">
+                <h2 class="text-xl font-bold text-slate-900 mb-6">Reserva tu Primera Clase</h2>
+                <form @submit.prevent="registerLead" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Nombre del Alumno</label>
+                        <input type="text" x-model="newLead.nombre" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-medical-light" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Teléfono de Contacto</label>
+                        <input type="tel" x-model="newLead.telefono" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-medical-light" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Instrumento / Programa</label>
+                        <input type="text" x-model="newLead.servicio" placeholder="Ej: Clases de Piano Online" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-medical-light" required>
+                    </div>
+                    <div class="flex gap-3 pt-4">
+                        <button type="button" @click="showLeadModal = false" class="flex-1 bg-slate-100 text-slate-700 py-3 rounded-xl font-semibold hover:bg-slate-200 transition">Cancelar</button>
+                        <button type="submit" class="flex-1 bg-medical-blue text-white py-3 rounded-xl font-semibold shadow-soft hover:bg-blue-900 transition flex justify-center items-center gap-2">
+                            <span x-show="!savingLead">Solicitar</span>
+                            <span x-show="savingLead" class="animate-pulse">Enviando...</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==========================================
+         VISTA 2: CRM ADMINISTRATIVO (SaaS)
+         ========================================== -->
+    <div x-show="view === 'admin'" x-transition.opacity.duration.500ms class="flex h-screen bg-premium-white text-slate-900" x-cloak>
+        
+        <!-- MODAL DE LOGIN ORIGINAL (Mantenido por compatibilidad) -->
+        <div x-show="!isAuthenticated" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md">
+            <div class="bg-white p-8 rounded-3xl shadow-2xl border border-slate-100 w-full max-w-md">
+                <div class="flex items-center gap-2 mb-6 justify-center">
+                    <i class="ph-fill ph-music-notes text-premium-gold text-3xl"></i>
+                    <h2 class="text-2xl font-bold text-medical-blue">Acceder al CRM</h2>
+                </div>
+                <p class="text-center text-sm text-slate-500 mb-6">Ingresa tus credenciales de administrador.</p>
+                <form @submit.prevent="login" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Correo Electrónico</label>
+                        <input type="email" x-model="loginEmail" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-medical-light" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Contraseña</label>
+                        <input type="password" x-model="loginPassword" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-medical-light" required>
+                    </div>
+                    <p x-show="loginError" x-text="loginError" class="text-red-500 text-xs font-medium text-center"></p>
+                    <button type="submit" class="w-full bg-medical-blue text-white py-3 rounded-xl font-semibold shadow-soft hover:bg-blue-900 transition flex justify-center items-center gap-2" :disabled="loginLoading">
+                        <span x-show="!loginLoading">Ingresar al Sistema</span>
+                        <span x-show="loginLoading" class="animate-pulse">Verificando...</span>
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Barra Lateral -->
+        <aside x-show="isAuthenticated" class="w-64 bg-white border-r border-slate-100 flex flex-col hidden md:flex">
+            <div class="p-6 border-b border-slate-50 flex items-center gap-2">
+                <i class="ph-fill ph-music-notes text-premium-gold text-2xl"></i>
+                <h2 class="text-xl font-bold text-medical-blue">Dan Music</h2>
+            </div>
+            <nav class="flex-1 p-4 space-y-2">
+                <a href="#" @click.prevent="adminTab = 'students'; fetchStudents()" :class="adminTab === 'students' ? 'bg-[#1A4BFF]/10 text-medical-blue' : 'text-slate-500 hover:bg-slate-50 hover:text-medical-blue'" class="flex items-center gap-3 px-4 py-3 rounded-2xl font-semibold transition">
+                    <i class="ph ph-users text-xl"></i> Alumnos
+                </a>
+                <a href="#" @click.prevent="adminTab = 'teachers'; fetchTeachers()" :class="adminTab === 'teachers' ? 'bg-[#1A4BFF]/10 text-medical-blue' : 'text-slate-500 hover:bg-slate-50 hover:text-medical-blue'" class="flex items-center gap-3 px-4 py-3 rounded-2xl font-semibold transition">
+                    <i class="ph ph-graduation-cap text-xl"></i> Profesores
+                </a>
+                <a href="#" @click.prevent="adminTab = 'usuarios'; fetchUsuarios()" :class="adminTab === 'usuarios' ? 'bg-[#1A4BFF]/10 text-medical-blue' : 'text-slate-500 hover:bg-slate-50 hover:text-medical-blue'" class="flex items-center gap-3 px-4 py-3 rounded-2xl font-semibold transition">
+                    <i class="ph ph-users-three text-xl"></i> Usuarios
+                </a>
+                <a href="#" @click.prevent="adminTab = 'agenda'; fetchLessons()" :class="adminTab === 'agenda' ? 'bg-[#1A4BFF]/10 text-medical-blue' : 'text-slate-500 hover:bg-slate-50 hover:text-medical-blue'" class="flex items-center gap-3 px-4 py-3 rounded-2xl font-semibold transition">
+                    <i class="ph ph-calendar-blank text-xl"></i> Agenda
+                </a>
+                <a href="#" @click.prevent="adminTab = 'pagos'; fetchPayments()" :class="adminTab === 'pagos' ? 'bg-[#1A4BFF]/10 text-medical-blue' : 'text-slate-500 hover:bg-slate-50 hover:text-medical-blue'" class="flex items-center gap-3 px-4 py-3 rounded-2xl font-semibold transition">
+                    <i class="ph ph-credit-card text-xl"></i> Pagos
+                </a>
+            </nav>
+            <div class="p-4 border-t border-slate-50">
+                <button @click="logout" class="flex items-center gap-3 px-4 py-3 w-full text-slate-500 hover:bg-red-50 hover:text-red-600 rounded-2xl font-medium transition">
+                    <i class="ph ph-sign-out text-xl"></i> Cerrar Sesión
+                </button>
+            </div>
+        </aside>
+
+        <!-- Contenido Principal -->
+        <main x-show="isAuthenticated" class="flex-1 overflow-y-auto p-8 bg-slate-50/50">
+            <div class="flex justify-between items-center mb-10">
+                <div>
+                    <h1 class="text-3xl font-bold text-slate-900">Hola, Admin</h1>
+                    <p class="text-slate-500 mt-1">Centro de Gestión de Alumnos.</p>
+                </div>
+                <button x-show="adminTab === 'students'" @click="showNewStudentModal = true" class="bg-medical-blue text-white px-5 py-2.5 rounded-xl shadow-sm hover:bg-blue-900 font-medium flex items-center gap-2">
+                    <i class="ph ph-plus font-bold"></i> Nuevo Alumno
+                </button>
+            </div>
+            
+            <!-- CONTENEDOR ALUMNOS -->
+            <div x-show="adminTab === 'students'">
+                <!-- KPIs Dinámicos -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
+                    <div class="bg-white p-6 rounded-3xl shadow-soft border border-slate-100">
+                        <div class="w-12 h-12 rounded-2xl bg-[#1A4BFF]/10 text-medical-blue flex items-center justify-center mb-4">
+                            <i class="ph-fill ph-users text-2xl"></i>
+                        </div>
+                        <h3 class="text-slate-500 text-sm font-medium">Alumnos Activos</h3>
+                        <p class="text-3xl font-bold text-slate-900 mt-1" x-text="students.length"></p>
+                        <p class="text-sage-dark text-sm mt-2 font-medium flex items-center gap-1"><i class="ph ph-trend-up"></i> Actualizado</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-3xl shadow-soft border border-slate-100">
+                        <div class="w-12 h-12 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center mb-4">
+                            <i class="ph-fill ph-broadcast text-2xl"></i>
+                        </div>
+                        <h3 class="text-slate-500 text-sm font-medium">Seguimiento de Clases en Vivo</h3>
+                        <p class="text-3xl font-bold text-slate-900 mt-1" x-text="students.filter(student => student.estado === 'En Curso').length"></p>
+                        <p class="text-amber-600 text-sm mt-2 font-medium flex items-center gap-1"><i class="ph ph-clock"></i> Tiempo real</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-3xl shadow-soft border border-slate-100">
+                        <div class="w-12 h-12 rounded-2xl bg-sage-light text-sage-dark flex items-center justify-center mb-4">
+                            <i class="ph-fill ph-star text-2xl"></i>
+                        </div>
+                        <h3 class="text-slate-500 text-sm font-medium">Satisfacción</h3>
+                        <p class="text-3xl font-bold text-slate-900 mt-1">4.9/5</p>
+                        <p class="text-sage-dark text-sm mt-2 font-medium">Basado en 50 reviews</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-3xl shadow-soft border border-slate-100">
+                        <div class="w-12 h-12 rounded-2xl bg-[#1A4BFF]/10 text-medical-blue flex items-center justify-center mb-4">
+                            <i class="ph-fill ph-currency-dollar text-2xl"></i>
+                        </div>
+                        <h3 class="text-slate-500 text-sm font-medium">Facturación (Mes)</h3>
+                        <p class="text-3xl font-bold text-slate-900 mt-1">$8,450</p>
+                        <p class="text-sage-dark text-sm mt-2 font-medium flex items-center gap-1"><i class="ph ph-trend-up"></i> +12% vs mes anterior</p>
+                    </div>
+                </div>
+
+                <!-- Tabla Dinámica de Clases en Vivo -->
+                <div class="bg-white rounded-3xl shadow-soft border border-slate-100 p-8">
+                    <h2 class="text-xl font-bold text-slate-900 mb-6">Seguimiento de Clases en Vivo</h2>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="text-slate-400 text-sm uppercase tracking-wider border-b border-slate-100">
+                                    <th class="pb-4 font-semibold">Alumno</th>
+                                    <th class="pb-4 font-semibold">Profesor</th>
+                                    <th class="pb-4 font-semibold">Instrumento</th>
+                                    <th class="pb-4 font-semibold">Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-sm">
+                                <template x-for="student in students" :key="student.id">
+                                    <tr class="border-b border-slate-50 hover:bg-slate-50 transition">
+                                        <td class="py-5 font-medium text-slate-900 flex items-center gap-3">
+                                            <div class="w-10 h-10 rounded-full bg-[#1A4BFF]/10 text-medical-blue flex items-center justify-center font-bold" x-text="(student?.nombre || 'NN').substring(0,2).toUpperCase()"></div>
+                                            <span x-text="student?.nombre || 'Desconocido'"></span>
+                                        </td>
+                                        <td class="py-5 text-slate-600" x-text="student?.teacher_id || 'No asignado'"></td>
+                                        <td class="py-5 text-slate-600" x-text="student?.instrumento || 'No especificado'"></td>
+                                        <td class="py-5 flex items-center gap-3">
+                                            <span :class="student.estado === 'En Curso' ? 'bg-amber-100 text-amber-700' : (student.estado === 'Pagado/Activo' ? 'bg-[#1A4BFF]/20 text-medical-blue' : (student.estado === 'Prospecto' || student.estado === 'Pendiente' ? 'bg-slate-100 text-slate-600' : 'bg-sage-light text-sage-dark'))" class="px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 w-max">
+                                                <span x-show="student.estado === 'En Curso'" class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                                                <i x-show="student.estado !== 'En Curso' && student.estado !== 'Prospecto' && student.estado !== 'Pendiente'" class="ph-fill ph-check-circle text-sm"></i>
+                                                <i x-show="student.estado === 'Prospecto' || student.estado === 'Pendiente'" class="ph-fill ph-clock text-sm"></i>
+                                                <span x-text="student.estado"></span>
+                                            </span>
+                                            <!-- Botón de Geolocalización -->
+                                            <a x-show="student.lat && student.lng" :href="'https://maps.google.com/?q=' + student.lat + ',' + student.lng" target="_blank" class="text-medical-light hover:text-medical-blue transition ml-2 bg-[#1A4BFF]/10 p-1.5 rounded-full" title="Ver Localización en Mapa">
+                                                <i class="ph-fill ph-map-pin text-lg"></i>
+                                            </a>
+                                        </td>
+                                    </tr>
+                                </template>
+                                <tr x-show="students.length === 0">
+                                    <td colspan="4" class="py-8 text-center text-slate-500">No hay alumnos registrados.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Actividad Reciente -->
+                <div class="bg-white rounded-3xl shadow-soft border border-slate-100 p-8 mt-8">
+                    <h2 class="text-xl font-bold text-slate-900 mb-6">Notas de Sesión y Actividad</h2>
+                    <div class="space-y-4">
+                        <template x-for="actividad in getActividadReciente()" :key="actividad.id + actividad.tipo">
+                            <div class="flex items-start gap-4 p-4 rounded-2xl hover:bg-slate-50 transition border border-transparent hover:border-slate-100">
+                                <div class="w-10 h-10 rounded-full flex items-center justify-center shrink-0" 
+                                     :class="actividad.tipo === 'progress_report' ? 'bg-[#1A4BFF]/10 text-medical-blue' : (actividad.tipo === 'pago' ? 'bg-sage-light text-sage-dark' : 'bg-amber-100 text-amber-600')">
+                                    <i class="ph-fill text-xl" :class="actividad.tipo === 'progress_report' ? 'ph-file-text' : (actividad.tipo === 'pago' ? 'ph-currency-dollar' : 'ph-calendar-check')"></i>
+                                </div>
+                                <div>
+                                    <p class="text-sm font-bold text-slate-800" x-text="actividad.titulo"></p>
+                                    <p class="text-xs text-slate-500 mt-1" x-text="actividad.descripcion"></p>
+                                    <p class="text-[10px] text-slate-400 mt-2 font-medium uppercase tracking-wider" x-text="formatDate(actividad.fecha)"></p>
+                                </div>
+                            </div>
+                        </template>
+                        <div x-show="getActividadReciente().length === 0" class="text-center py-8 text-slate-500 text-sm">
+                            No hay actividad reciente registrada.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CONTENEDOR PROFESORES -->
+            <div x-show="adminTab === 'teachers'" x-cloak>
+                <div class="bg-white rounded-3xl shadow-soft border border-slate-100 p-8">
+                    <h2 class="text-xl font-bold text-slate-900 mb-6">Gestión de Profesores</h2>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="text-slate-400 text-sm uppercase tracking-wider border-b border-slate-100">
+                                    <th class="pb-4 font-semibold">Nombre</th>
+                                    <th class="pb-4 font-semibold">Email</th>
+                                    <th class="pb-4 font-semibold">Estado</th>
+                                    <th class="pb-4 font-semibold">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-sm">
+                                <template x-for="teacher in teachers" :key="teacher.id">
+                                    <tr class="border-b border-slate-50 hover:bg-slate-50 transition">
+                                        <td class="py-5 font-medium text-slate-900" x-text="teacher.nombre"></td>
+                                        <td class="py-5 text-slate-600" x-text="teacher.email"></td>
+                                        <td class="py-5">
+                                            <span class="px-3 py-1.5 rounded-full text-xs font-bold"
+                                                  :class="{
+                                                      'bg-amber-100 text-amber-700': teacher.estado === 'pendiente',
+                                                      'bg-sage-light text-sage-dark': teacher.estado === 'aprobado',
+                                                      'bg-red-100 text-red-700': teacher.estado === 'rechazado' || teacher.estado === 'inactivo'
+                                                  }" x-text="teacher.estado.toUpperCase()"></span>
+                                        </td>
+                                        <td class="py-5 flex gap-2">
+                                            <button x-show="teacher.estado !== 'aprobado'" @click="updateTeacherStatus(teacher.id, 'aprobado')" class="bg-sage-light text-sage-dark px-3 py-1 rounded-lg text-xs font-bold hover:bg-sage-dark hover:text-white transition">Aprobar</button>
+                                            <button x-show="teacher.estado !== 'rechazado' && teacher.estado === 'pendiente'" @click="updateTeacherStatus(teacher.id, 'rechazado')" class="bg-red-100 text-red-700 px-3 py-1 rounded-lg text-xs font-bold hover:bg-red-600 hover:text-white transition">Rechazar</button>
+                                            <button x-show="teacher.estado === 'aprobado'" @click="updateTeacherStatus(teacher.id, 'inactivo')" class="bg-slate-100 text-slate-700 px-3 py-1 rounded-lg text-xs font-bold hover:bg-slate-200 transition">Desactivar</button>
+                                            <button @click="deleteUsuario(teacher.id, 'teacher', teacher.email)" class="bg-red-50 text-red-500 px-3 py-1 rounded-lg text-xs font-bold hover:bg-red-100 transition" title="Eliminar Usuario"><i class="ph ph-trash"></i></button>
+                                        </td>
+                                    </tr>
+                                </template>
+                                <tr x-show="teachers.length === 0">
+                                    <td colspan="4" class="py-8 text-center text-slate-500">No hay profesores registrados.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CONTENEDOR USUARIOS -->
+            <div x-show="adminTab === 'usuarios'" x-cloak>
+                <div class="bg-white rounded-3xl shadow-soft border border-slate-100 p-8">
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                        <h2 class="text-xl font-bold text-slate-900">Administración de Usuarios</h2>
+                        
+                        <div class="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                            <!-- Buscador -->
+                            <div class="relative">
+                                <i class="ph ph-magnifying-glass absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400"></i>
+                                <input type="text" x-model="searchUsuario" placeholder="Buscar por nombre o email..." class="pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-medical-light w-full sm:w-64">
+                            </div>
+                            
+                            <!-- Filtros -->
+                            <select x-model="filterUsuario" class="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-medical-light outline-none appearance-none pr-8 relative">
+                                <option value="todos">Todos los usuarios</option>
+                                <option value="students">Alumnos</option>
+                                <option value="teachers">Profesores (Todos)</option>
+                                <option value="pendientes">Profesores Pendientes</option>
+                                <option value="aprobadas">Profesores Aprobados</option>
+                                <option value="rechazadas">Profesores Rechazados</option>
+                                <option value="inactivas">Profesores Inactivos</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="text-slate-400 text-sm uppercase tracking-wider border-b border-slate-100">
+                                    <th class="pb-4 font-semibold">Usuario</th>
+                                    <th class="pb-4 font-semibold">Contacto</th>
+                                    <th class="pb-4 font-semibold">Tipo</th>
+                                    <th class="pb-4 font-semibold">Estado</th>
+                                    <th class="pb-4 font-semibold">Registro</th>
+                                    <th class="pb-4 font-semibold">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-sm">
+                                <template x-for="usuario in filteredUsuarios" :key="usuario.id">
+                                    <tr class="border-b border-slate-50 hover:bg-slate-50 transition">
+                                        <td class="py-5 font-medium text-slate-900 flex items-center gap-3">
+                                            <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold"
+                                                 :class="usuario.rol === 'admin' ? 'bg-slate-800 text-white' : (usuario.rol === 'teacher' ? 'bg-sage-light text-sage-dark' : 'bg-[#1A4BFF]/10 text-medical-blue')"
+                                                 x-text="(usuario.nombre || 'NN').substring(0,2).toUpperCase()"></div>
+                                            <span x-text="usuario.nombre || 'Desconocido'"></span>
+                                        </td>
+                                        <td class="py-5 text-slate-600" x-text="usuario.email"></td>
+                                        <td class="py-5">
+                                            <span class="px-3 py-1.5 rounded-full text-xs font-bold"
+                                                  :class="usuario.rol === 'admin' ? 'bg-slate-100 text-slate-700' : (usuario.rol === 'teacher' ? 'bg-sage-light/50 text-sage-dark' : 'bg-[#1A4BFF]/10 text-medical-blue')"
+                                                  x-text="usuario.rol === 'student' ? 'Alumno' : (usuario.rol === 'teacher' ? 'Profesor' : 'Admin')"></span>
+                                        </td>
+                                        <td class="py-5">
+                                            <span x-show="usuario.rol === 'teacher'" class="px-3 py-1.5 rounded-full text-xs font-bold"
+                                                  :class="{
+                                                      'bg-amber-100 text-amber-700': usuario.estado === 'pendiente',
+                                                      'bg-sage-light text-sage-dark': usuario.estado === 'aprobado',
+                                                      'bg-red-100 text-red-700': usuario.estado === 'rechazado' || usuario.estado === 'inactivo'
+                                                  }" x-text="(usuario.estado || 'pendiente').toUpperCase()"></span>
+                                            <span x-show="usuario.rol === 'student'" class="px-3 py-1.5 rounded-full text-xs font-bold"
+                                                  :class="usuario.estado === 'Inactivo' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'"
+                                                  x-text="(usuario.estado || 'ACTIVO').toUpperCase()"></span>
+                                        </td>
+                                        <td class="py-5 text-slate-500 text-xs" x-text="formatDate(usuario.created_at)"></td>
+                                        <td class="py-5 flex gap-2 flex-wrap max-w-[250px]">
+                                            <!-- Ver -->
+                                            <button @click="verUsuario(usuario)" class="bg-[#1A4BFF]/10 text-medical-blue px-2 py-1 rounded-lg text-xs font-bold hover:bg-[#1A4BFF]/20 transition" title="Ver Detalles">Ver</button>
+                                            
+                                            <!-- Acciones Profesor Pendiente -->
+                                            <template x-if="usuario.rol === 'teacher' && usuario.estado === 'pendiente'">
+                                                <div class="flex gap-1">
+                                                    <button @click="updateTeacherStatus(usuario.id, 'aprobado')" class="bg-sage-light text-sage-dark px-2 py-1 rounded-lg text-xs font-bold hover:bg-sage-dark hover:text-white transition">Aprobar</button>
+                                                    <button @click="updateTeacherStatus(usuario.id, 'rechazado')" class="bg-red-100 text-red-700 px-2 py-1 rounded-lg text-xs font-bold hover:bg-red-600 hover:text-white transition">Rechazar</button>
+                                                </div>
+                                            </template>
+
+                                            <!-- Desactivar -->
+                                            <button x-show="(usuario.rol === 'teacher' && usuario.estado === 'aprobado') || (usuario.rol === 'student' && usuario.estado !== 'Inactivo')" 
+                                                    @click="desactivarUsuario(usuario)" 
+                                                    class="bg-slate-100 text-slate-700 px-2 py-1 rounded-lg text-xs font-bold hover:bg-slate-200 transition" title="Desactivar">Desactivar</button>
+                                            
+                                            <!-- Reactivar -->
+                                            <button x-show="(usuario.rol === 'teacher' && (usuario.estado === 'inactivo' || usuario.estado === 'rechazado')) || (usuario.rol === 'student' && usuario.estado === 'Inactivo')" 
+                                                    @click="reactivarUsuario(usuario)" 
+                                                    class="bg-amber-100 text-amber-700 px-2 py-1 rounded-lg text-xs font-bold hover:bg-amber-200 transition" title="Reactivar">Reactivar</button>
+                                            
+                                            <!-- Eliminar -->
+                                            <button x-show="usuario.email !== DUEÑO_EMAIL" 
+                                                    @click="deleteUsuario(usuario.id, usuario.rol, usuario.email)" 
+                                                    class="bg-red-50 text-red-500 px-2 py-1 rounded-lg text-xs font-bold hover:bg-red-100 transition" title="Eliminar Usuario">Eliminar</button>
+                                        </td>
+                                    </tr>
+                                </template>
+                                <tr x-show="filteredUsuarios.length === 0">
+                                    <td colspan="6" class="py-8 text-center text-slate-500">No se encontraron usuarios con los filtros actuales.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CONTENEDOR AGENDA -->
+            <div x-show="adminTab === 'agenda'" x-cloak>
+                <div class="bg-white rounded-3xl shadow-soft border border-slate-100 p-8">
+                    <h2 class="text-xl font-bold text-slate-900 mb-6">Programación de Clases</h2>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="text-slate-400 text-sm uppercase tracking-wider border-b border-slate-100">
+                                    <th class="pb-4 font-semibold">Fecha</th>
+                                    <th class="pb-4 font-semibold">Horario</th>
+                                    <th class="pb-4 font-semibold">Estado</th>
+                                    <th class="pb-4 font-semibold">Notas</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-sm">
+                                <template x-for="lesson in lessons" :key="lesson.id">
+                                    <tr class="border-b border-slate-50 hover:bg-slate-50 transition">
+                                        <td class="py-5 font-medium text-slate-900" x-text="lesson?.fecha || 'N/A'"></td>
+                                        <td class="py-5 text-slate-600" x-text="(lesson?.hora_inicio || '') + ' - ' + (lesson?.hora_fin || '')"></td>
+                                        <td class="py-5">
+                                            <span class="px-3 py-1.5 rounded-full text-xs font-bold bg-slate-100 text-slate-600" x-text="lesson?.estado || 'Pendiente'"></span>
+                                        </td>
+                                        <td class="py-5 text-slate-600" x-text="lesson?.notas || '-'"></td>
+                                    </tr>
+                                </template>
+                                <tr x-show="lessons.length === 0">
+                                    <td colspan="4" class="py-8 text-center text-slate-500">No hay clases registradas.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CONTENEDOR PAGOS -->
+            <div x-show="adminTab === 'pagos'" x-cloak>
+                <div class="bg-white rounded-3xl shadow-soft border border-slate-100 p-8">
+                    <h2 class="text-xl font-bold text-slate-900 mb-6">Centro de Pagos</h2>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="text-slate-400 text-sm uppercase tracking-wider border-b border-slate-100">
+                                    <th class="pb-4 font-semibold">ID Pago</th>
+                                    <th class="pb-4 font-semibold">Monto</th>
+                                    <th class="pb-4 font-semibold">Método</th>
+                                    <th class="pb-4 font-semibold">Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-sm">
+                                <template x-for="payment in payments" :key="payment.id">
+                                    <tr class="border-b border-slate-50 hover:bg-slate-50 transition">
+                                        <td class="py-5 font-medium text-slate-900" x-text="'#' + payment.id"></td>
+                                        <td class="py-5 text-slate-600 font-semibold" x-text="'$' + (payment?.monto || '0')"></td>
+                                        <td class="py-5 text-slate-600" x-text="payment?.metodo || 'N/A'"></td>
+                                        <td class="py-5">
+                                            <span class="px-3 py-1.5 rounded-full text-xs font-bold bg-sage-light text-sage-dark" x-text="payment?.estado || 'Completado'"></span>
+                                        </td>
+                                    </tr>
+                                </template>
+                                <tr x-show="payments.length === 0">
+                                    <td colspan="4" class="py-8 text-center text-slate-500">No hay pagos registrados.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+
+        <!-- Modal Nuevo Alumno -->
+        <div x-show="showNewStudentModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md" x-cloak>
+            <div class="bg-white p-8 rounded-3xl shadow-2xl border border-slate-100 w-full max-w-md" @click.away="showNewStudentModal = false">
+                <h2 class="text-xl font-bold text-slate-900 mb-6">Registrar Nuevo Alumno</h2>
+                <form @submit.prevent="addStudent" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Nombre del Alumno</label>
+                        <input type="text" x-model="newStudent.nombre" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-medical-light" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Profesor Asignado (Nombre o ID)</label>
+                        <input type="text" x-model="newStudent.teacher_id" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-medical-light" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Instrumento / Programa</label>
+                        <input type="text" x-model="newStudent.instrumento" placeholder="Ej: Piano Nivel 1" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-medical-light" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Nivel</label>
+                        <input type="text" x-model="newStudent.nivel" placeholder="Ej: Principiante" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-medical-light">
+                    </div>
+                    <div class="flex gap-3 pt-4">
+                        <button type="button" @click="showNewStudentModal = false" class="flex-1 bg-slate-100 text-slate-700 py-3 rounded-xl font-semibold hover:bg-slate-200 transition">Cancelar</button>
+                        <button type="submit" class="flex-1 bg-medical-blue text-white py-3 rounded-xl font-semibold shadow-soft hover:bg-blue-900 transition flex justify-center items-center gap-2">
+                            <span x-show="!savingStudent">Guardar</span>
+                            <span x-show="savingStudent" class="animate-pulse">Guardando...</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==========================================
+         VISTA 3: PORTAL ALUMNO (STUDENT) (Mobile First)
+         ========================================== -->
+    <div x-show="view === 'student'" x-transition.opacity.duration.500ms class="min-h-screen bg-premium-beige flex justify-center items-center p-4" x-cloak>
+        <!-- Simulador de Teléfono -->
+        <div class="w-full max-w-[400px] bg-black rounded-[3rem] shadow-2xl overflow-hidden border-[8px] border-slate-900 relative h-[800px] flex flex-col">
+            
+            <!-- Encabezado App -->
+            <div class="bg-medical-blue text-white p-6 pt-12 rounded-b-[2.5rem] shadow-md relative z-10">
+                <div class="flex justify-between items-center mb-4">
+                    <div>
+                        <p class="text-medical-light/80 text-sm font-medium">Hola, <span x-text="currentStudent?.nombre || 'Alumno'"></span></p>
+                        <h2 class="text-2xl font-bold">Portal Alumno</h2>
+                    </div>
+                    <div class="flex gap-2">
+                        <button @click="openWhatsApp('Hola, necesito soporte con mi Portal de Alumno.')" class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center backdrop-blur-sm hover:bg-white/20 transition">
+                            <i class="ph ph-headset text-xl"></i>
+                        </button>
+                        <button @click="logout" class="w-10 h-10 rounded-full bg-red-500/20 text-red-100 flex items-center justify-center backdrop-blur-sm hover:bg-red-500/40 transition" title="Cerrar Sesión">
+                            <i class="ph ph-sign-out text-xl"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Selector de Alumnos (Si hay múltiples) -->
+                <select x-show="students.length > 1" x-model="currentStudentId" @change="loadStudentContext(currentStudentId)" class="mb-4 bg-white/20 text-white text-sm rounded-xl px-3 py-2 outline-none w-full appearance-none border border-white/10">
+                    <template x-for="student in students" :key="student.id">
+                        <option :value="student.id" x-text="student.nombre" class="text-slate-900"></option>
+                    </template>
+                </select>
+                
+                <!-- Tarjeta de Estado -->
+                <div class="bg-white text-slate-800 p-4 rounded-2xl shadow-lg flex items-center gap-4">
+                    <div class="relative">
+                        <img src="https://i.pravatar.cc/100?img=11" class="w-14 h-14 rounded-full border-2 border-sage-dark object-cover">
+                        <div class="absolute bottom-0 right-0 w-4 h-4 bg-sage-dark border-2 border-white rounded-full"></div>
+                    </div>
+                    <div>
+                        <p class="text-[10px] text-sage-dark font-bold uppercase tracking-wider mb-0.5">En este momento</p>
+                        <p class="font-bold text-sm leading-tight"><span x-text="currentStudent?.teacher_id || 'El profesor'"></span> está con <span x-text="currentStudent?.nombre || 'el alumno'"></span>.</p>
+                        <p class="text-xs text-slate-500 mt-1 flex items-center gap-1"><i class="ph ph-clock"></i> Llegó a las <span x-text="currentLesson?.hora_inicio || '08:00 AM'"></span></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cuerpo App -->
+            <div class="flex-1 p-6 overflow-y-auto no-scrollbar space-y-6 pb-24 bg-[#F5F5F7]">
+                
+                <!-- Progreso de Clase y Notas -->
+                <div>
+                    <h3 class="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
+                        <i class="ph-fill ph-sparkle text-medical-light"></i> Progreso de Clase y Notas
+                    </h3>
+                    <div class="relative p-5 rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+                        <!-- Imagen de fondo -->
+                        <div class="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1511379938547-c1f69419868d?q=80&w=600&auto=format&fit=crop')] bg-cover bg-center"></div>
+                        <!-- Overlay translúcido -->
+                        <div class="absolute inset-0 bg-white/90 backdrop-blur-sm"></div>
+                        
+                        <!-- Contenido -->
+                        <div class="relative z-10">
+                            <!-- SI existen registros -->
+                            <div x-show="currentProgress">
+                                <p class="text-sm text-slate-800 leading-relaxed font-medium" x-text="currentProgress?.contenido"></p>
+                            </div>
+                            
+                            <!-- SI NO existen registros -->
+                            <div x-show="!currentProgress" class="text-center py-3">
+                                <div class="w-12 h-12 bg-[#1A4BFF]/10 text-medical-blue rounded-full flex items-center justify-center mx-auto mb-3 border border-[#1A4BFF]/20">
+                                    <i class="ph-fill ph-hourglass-medium text-2xl animate-pulse"></i>
+                                </div>
+                                <p class="font-bold text-slate-800 text-sm mb-2">Notas en proceso de actualización</p>
+                                <p class="text-xs text-slate-600 leading-relaxed">
+                                    Bienvenido a tu centro de progreso musical. Los ejercicios, técnica y repertorio están siendo registrados por tu instructor. En breves instantes visualizarás aquí la evolución de tu clase y las tareas asignadas.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tareas de Práctica -->
+                <div>
+                    <h3 class="text-sm font-bold text-slate-800 mb-3">Tareas de Práctica para Hoy</h3>
+                    <div class="space-y-3">
+                        <template x-for="task in currentPracticeTasks" :key="task.id">
+                            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex justify-between items-center" :class="!task.estado ? 'opacity-60' : ''">
+                                <div class="flex items-center gap-4">
+                                    <div :class="task.estado ? 'bg-[#1A4BFF]/10 text-medical-blue' : 'bg-slate-100 text-slate-500'" class="p-2.5 rounded-xl">
+                                        <i class="ph-fill ph-metronome text-xl"></i>
+                                    </div>
+                                    <div>
+                                        <p class="font-bold text-sm text-slate-800" x-text="task.titulo"></p>
+                                        <p class="text-xs text-slate-500" x-text="task.fecha_entrega + ' - ' + task.descripcion"></p>
+                                    </div>
+                                </div>
+                                <i x-show="task.estado" class="ph-fill ph-check-circle text-sage-dark text-2xl"></i>
+                                <i x-show="!task.estado" class="ph ph-clock text-slate-400 text-2xl"></i>
+                            </div>
+                        </template>
+                        <div x-show="!currentPracticeTasks || currentPracticeTasks.length === 0" class="text-sm text-slate-500 text-center py-2">No hay tareas de práctica registradas.</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Navegación Inferior App -->
+            <div class="absolute bottom-0 w-full bg-white border-t border-slate-100 p-4 flex justify-around items-center text-slate-400 pb-8 rounded-b-[2.5rem]">
+                <div class="flex flex-col items-center text-medical-blue cursor-pointer">
+                    <i class="ph-fill ph-house text-2xl"></i>
+                    <span class="text-[10px] font-semibold mt-1">Inicio</span>
+                </div>
+                <div @click="openWhatsApp('Hola, deseo agendar una nueva clase.')" class="flex flex-col items-center hover:text-medical-blue transition cursor-pointer">
+                    <i class="ph ph-calendar-blank text-2xl"></i>
+                    <span class="text-[10px] font-medium mt-1">Agenda</span>
+                </div>
+                <div @click="payService(currentStudentId)" class="flex flex-col items-center hover:text-medical-blue transition cursor-pointer">
+                    <i class="ph ph-credit-card text-2xl"></i>
+                    <span class="text-[10px] font-medium mt-1">Pagos</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==========================================
+         VISTA 4: APP PROFESOR (TEACHER) (Mobile First)
+         ========================================== -->
+    <div x-show="view === 'teacher'" x-transition.opacity.duration.500ms class="min-h-screen bg-premium-beige flex justify-center items-center p-4" x-cloak>
+        <!-- Simulador de Teléfono -->
+        <div class="w-full max-w-[400px] bg-slate-50 rounded-[3rem] shadow-2xl overflow-hidden border-[8px] border-slate-900 relative h-[800px] flex flex-col">
+            
+            <!-- Encabezado App -->
+            <div class="bg-medical-blue text-white p-6 pt-12 rounded-b-[2.5rem] shadow-md relative z-10">
+                <div class="flex justify-between items-start mb-2">
+                    <div>
+                        <p class="text-medical-light/80 text-sm font-medium">Clase Actual</p>
+                        <h1 class="text-2xl font-bold mt-1" x-text="currentStudent?.nombre || 'Alumno'"></h1>
+                    </div>
+                    <button @click="logout" class="w-10 h-10 rounded-full bg-red-500/20 text-red-100 flex items-center justify-center backdrop-blur-sm hover:bg-red-500/40 transition" title="Cerrar Sesión">
+                        <i class="ph ph-sign-out text-xl"></i>
+                    </button>
+                </div>
+                
+                <!-- Selector de Alumnos (Si hay múltiples) -->
+                <select x-show="students.length > 1" x-model="currentStudentId" @change="loadStudentContext(currentStudentId)" class="mt-2 bg-white/20 text-white text-sm rounded-xl px-3 py-2 outline-none w-full appearance-none border border-white/10">
+                    <template x-for="student in students" :key="student.id">
+                        <option :value="student.id" x-text="student.nombre" class="text-slate-900"></option>
+                    </template>
+                </select>
+
+                <div class="flex items-center gap-2 mt-4 text-sm bg-white/10 w-max px-4 py-2 rounded-full backdrop-blur-sm">
+                    <i class="ph ph-clock"></i> <span x-text="(currentLesson?.hora_inicio || '08:00') + ' - ' + (currentLesson?.hora_fin || '16:00')"></span>
+                </div>
+            </div>
+
+            <!-- Cuerpo App -->
+            <div class="flex-1 p-6 overflow-y-auto no-scrollbar space-y-6 pb-24 bg-[#F5F5F7]">
+                
+                <!-- Acciones Rápidas -->
+                <div class="grid grid-cols-2 gap-4">
+                    <button @click="currentLesson?.estado === 'en curso' ? endLesson(currentLesson?.id) : startLesson(currentLesson?.id)" class="bg-white p-4 rounded-3xl shadow-sm border border-slate-100 flex flex-col items-center justify-center gap-2 text-medical-blue font-semibold hover:bg-slate-50 transition">
+                        <i class="ph-fill ph-check-circle text-3xl"></i> <span x-text="currentLesson?.estado === 'en curso' ? 'Finalizar Clase' : 'Iniciar Clase'"></span>
+                    </button>
+                    <button @click="openWhatsApp('¡ASISTENCIA! Necesito contactar a soporte para la clase de ' + (currentStudent?.nombre || 'mi alumno') + '.')" class="bg-red-50 p-4 rounded-3xl shadow-sm border border-red-100 flex flex-col items-center justify-center gap-2 text-red-600 font-semibold hover:bg-red-100 transition">
+                        <i class="ph-fill ph-warning-circle text-3xl"></i> Emergencia
+                    </button>
+                </div>
+
+                <!-- Botón GPS Inyectado -->
+                <button @click="toggleGps(currentStudentId)" :class="gpsActive ? 'bg-sage-light text-sage-dark border-sage-dark' : 'bg-white text-slate-700 border-slate-100 hover:bg-slate-50'" class="w-full p-4 rounded-3xl shadow-sm border flex items-center justify-center gap-3 font-semibold transition">
+                    <i class="ph-fill ph-map-pin text-2xl" :class="gpsActive ? 'animate-pulse' : ''"></i> 
+                    <span x-text="gpsActive ? 'GPS Transmitiendo al CRM' : 'Profesor en Ruta (GPS)'"></span>
+                </button>
+
+                <!-- Tareas de Práctica -->
+                <div class="bg-white p-5 rounded-3xl shadow-sm border border-slate-100">
+                    <h3 class="font-bold text-slate-900 mb-4">Tareas a revisar</h3>
+                    <template x-for="task in currentPracticeTasks" :key="task.id">
+                        <div class="flex items-center justify-between p-3 bg-slate-50 rounded-2xl mb-2">
+                            <div>
+                                <p class="font-bold text-slate-800 text-sm" x-text="task.titulo"></p>
+                                <p class="text-xs text-slate-500" x-text="task.fecha_entrega + ' - ' + task.descripcion"></p>
+                            </div>
+                            <input type="checkbox" :checked="task.estado" @change="togglePracticeTask(task.id, $event.target.checked)" class="w-6 h-6 rounded-full text-sage-dark focus:ring-sage-dark border-slate-300" />
+                        </div>
+                    </template>
+                    <div x-show="!currentPracticeTasks || currentPracticeTasks.length === 0" class="text-sm text-slate-500 text-center py-2">No hay tareas asignadas.</div>
+                </div>
+
+                <!-- Registro Rápido IA -->
+                <div class="bg-white p-5 rounded-3xl shadow-sm border border-slate-100">
+                    <h3 class="font-bold text-slate-900 mb-1">Registro de Evolución de la Clase</h3>
+                    <p class="text-xs text-slate-500 mb-4">Detalla el progreso técnico, repertorio revisado y observaciones de la sesión.</p>
+                    
+                    <textarea 
+                        x-model="progresoIA"
+                        class="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-medical-light resize-none"
+                        rows="4"
+                        placeholder="Ej: Excelente progreso en técnica de escalas. Se revisó repertorio clásico. Tarea: Practicar compases 15-30 con metrónomo a 80bpm."
+                    ></textarea>
+                    
+                    <button 
+                        @click="createProgressReport(currentStudentId)"
+                        class="w-full bg-medical-blue text-white py-3.5 rounded-2xl mt-4 font-semibold shadow-soft hover:bg-blue-900 transition flex justify-center items-center gap-2"
+                        :class="aiDone ? 'bg-sage-dark hover:bg-sage-dark' : ''"
+                    >
+                        <span x-show="!aiGenerating && !aiDone"><i class="ph-fill ph-sparkle"></i> Procesar Notas de Clase</span>
+                        <span x-show="aiGenerating" class="animate-pulse">Procesando y estructurando registro...</span>
+                        <span x-show="aiDone"><i class="ph-fill ph-check-circle"></i> Registro Enviado al Alumno</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==========================================
+         VISTA 5: PROFESOR PENDIENTE (TEACHER PENDING)
+         ========================================== -->
+    <div x-show="view === 'teacher_pending'" x-transition.opacity.duration.500ms class="min-h-screen bg-premium-beige flex justify-center items-center p-4" x-cloak>
+        <div class="bg-white p-8 rounded-3xl shadow-2xl border border-slate-100 w-full max-w-md text-center">
+            <div class="w-20 h-20 bg-amber-100 text-amber-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                <i class="ph-fill ph-hourglass-high text-4xl animate-pulse"></i>
+            </div>
+            <h2 class="text-2xl font-bold text-slate-900 mb-2">Solicitud en Revisión</h2>
+            <p class="text-slate-600 mb-8">Su solicitud está siendo revisada por el equipo de Dan Music Anywhere. Le notificaremos una vez sea aprobada para comenzar a ofrecer sus clases.</p>
+            <button @click="logout" class="w-full bg-slate-100 text-slate-700 py-3 rounded-xl font-semibold hover:bg-slate-200 transition">Cerrar Sesión</button>
+        </div>
+    </div>
+
+    <!-- ==========================================
+         VISTA 6: PROFESOR RECHAZADO / INACTIVO (TEACHER REJECTED)
+         ========================================== -->
+    <div x-show="view === 'teacher_rejected'" x-transition.opacity.duration.500ms class="min-h-screen bg-premium-beige flex justify-center items-center p-4" x-cloak>
+        <div class="bg-white p-8 rounded-3xl shadow-2xl border border-slate-100 w-full max-w-md text-center">
+            <div class="w-20 h-20 bg-red-100 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                <i class="ph-fill ph-x-circle text-4xl"></i>
+            </div>
+            <h2 class="text-2xl font-bold text-slate-900 mb-2">Acceso Denegado</h2>
+            <p class="text-slate-600 mb-8">Su solicitud no ha sido aprobada o su cuenta ha sido desactivada. Por favor, contacte a soporte para más información.</p>
+            <button @click="logout" class="w-full bg-slate-100 text-slate-700 py-3 rounded-xl font-semibold hover:bg-slate-200 transition">Cerrar Sesión</button>
+        </div>
+    </div>
+
+    <!-- ==========================================
+         LÓGICA PRINCIPAL (Alpine.js + Supabase)
+         ========================================== -->
+    <script>
+        function danMusicApp() {
+            return {
+                // ==========================================
+                // 1. VARIABLES DE CONFIGURACIÓN CRÍTICAS
+                // ==========================================
+                SUPABASE_URL: 'https://hurtorxxcsucoqseddoo.supabase.co', 
+                SUPABASE_KEY: 'sb_publishable__R2Pk4aXb4jDSxZ6yUQhFA_Thio5q7o',
+                
+                DUEÑO_EMAIL: 'danmusicanywhere@gmail.com',
+                WHATSAPP_NUM: '56975371239',
+                LINK_PAGO_DIRECTO: 'https://link.mercadopago.com.co/tu_link_de_pago',
+
+                // ==========================================
+                // 2. ESTADO DE LA APLICACIÓN
+                // ==========================================
+                view: 'landing',
+                aiGenerating: false,
+                aiDone: false,
+                
+                // Auth Global & Roles
+                isAuthenticated: false,
+                userRole: null,
+                userEmail: null,
+                userId: null,
+                userName: null,
+                teacherStatus: null,
+                showLoginModal: false,
+                showRegisterModal: false,
+                
+                loginEmail: '',
+                loginPassword: '',
+                loginLoading: false,
+                loginError: '',
+
+                registerData: { nombre: '', email: '', password: '', confirmPassword: '', role: 'student' },
+                registerLoading: false,
+                registerError: '',
+                
+                // Base de Datos (Sin mocks)
+                supabase: null,
+                students: [],
+                lessons: [],
+                progress_reports: [],
+                payments: [],
+                teachers: [],
+                usuarios: [], // Nuevo estado para Administración de Usuarios
+                
+                // Contexto de Vistas Móviles
+                currentStudentId: null,
+                currentStudent: null,
+                currentLesson: null,
+                currentProgress: null,
+                currentPracticeTasks: [],
+                progresoIA: '',
+                lastGpsUpdate: 0,
+                realtimeChannel: null,
+
+                // Modal Nuevo Alumno
+                showNewStudentModal: false,
+                savingStudent: false,
+                newStudent: { nombre: '', teacher_id: '', instrumento: '', nivel: '' },
+
+                // Modal Lead (Landing)
+                showLeadModal: false,
+                savingLead: false,
+                newLead: { nombre: '', telefono: '', servicio: '' },
+
+                // Navegación CRM Admin
+                adminTab: 'students',
+                searchUsuario: '',
+                filterUsuario: 'todos',
+                
+                // Geolocalización
+                gpsWatchId: null,
+                gpsActive: false,
+
+                // ==========================================
+                // 3. MÉTODOS Y FUNCIONES
+                // ==========================================
+                async init() {
+                    try {
+                        if (!this.SUPABASE_URL || this.SUPABASE_URL === 'TU_SUPABASE_URL_REAL') {
+                            console.warn("Supabase no configurado. La app requiere credenciales reales para funcionar.");
+                            return;
+                        }
+                        
+                        this.supabase = window.supabase.createClient(this.SUPABASE_URL, this.SUPABASE_KEY);
+                        
+                        // Escuchar cambios de autenticación para evitar desincronización
+                        this.supabase.auth.onAuthStateChange((event, session) => {
+                            if (event === 'SIGNED_OUT') {
+                                this.clearLocalState();
+                            }
+                        });
+
+                        await this.checkSession();
+                        
+                    } catch (err) {
+                        console.error("Error inicializando la app:", err.message);
+                    }
+
+                    this.$watch('view', (val) => {
+                        if (val === 'admin' && this.isAuthenticated && this.userRole === 'admin') {
+                            this.loadInitialData();
+                        }
+                        if (val !== 'teacher' && this.gpsActive) {
+                            this.stopGps();
+                        }
+                    });
+                },
+
+                async sendEmailNotification(type, payload) {
+                    // Endpoint preparado para: danmusicanywhere@gmail.com
+                    // Tipos: nuevo_registro, nuevo_profesor, clase_agendada, pago_recibido, profesor_aprobado, tarea_asignada, nuevo_registro_progreso
+                    console.log(`[EMAIL HOOK] Enviando a danmusicanywhere@gmail.com - Tipo: ${type}`, payload);
+                    // Aquí iría la llamada a la Edge Function o API de correos (ej. Resend/SendGrid)
+                },
+
+                async checkSession() {
+                    if (!this.supabase) return;
+                    const { data: { session }, error } = await this.supabase.auth.getSession();
+                    if (session) {
+                        await this.processLogin(session.user);
+                    }
+                },
+
+                async processLogin(user) {
+                    this.isAuthenticated = true;
+                    this.userEmail = user.email;
+                    this.userId = user.id;
+                    this.userName = user.user_metadata?.nombre || 'Usuario';
+                    
+                    let rawRole = user.user_metadata?.role || 'student';
+                    
+                    if (this.userEmail === this.DUEÑO_EMAIL) {
+                        this.userRole = 'admin';
+                        this.view = 'admin';
+                    } else {
+                        this.userRole = rawRole;
+                    }
+                    
+                    await this.checkAndCreateProfile(user);
+                    
+                    // Enrutamiento basado en rol y estado
+                    if (this.userRole === 'teacher') {
+                        if (this.teacherStatus === 'pendiente') {
+                            this.view = 'teacher_pending';
+                        } else if (this.teacherStatus === 'rechazado' || this.teacherStatus === 'inactivo') {
+                            this.view = 'teacher_rejected';
+                        } else {
+                            this.view = 'teacher';
+                        }
+                    } else if (this.userRole === 'student') {
+                        this.view = 'student';
+                    }
+
+                    await this.loadInitialData();
+                    await this.subscribeRealtime();
+                },
+
+                async checkAndCreateProfile(user) {
+                    if (!this.supabase) return;
+                    try {
+                        let rol = user.user_metadata?.role || 'student';
+                        if (user.email === this.DUEÑO_EMAIL) rol = 'admin';
+                        
+                        const nombre = user.user_metadata?.nombre || (user.email === this.DUEÑO_EMAIL ? 'Administrador' : 'Usuario');
+
+                        if (rol === 'student') {
+                            // Intentar obtener el alumno para persistencia real
+                            const { data, error } = await this.supabase.from('students').select('id').eq('id', user.id).single();
+                            
+                            // Si no existe (error PGRST116 es "no rows returned"), lo creamos
+                            if (error && error.code === 'PGRST116') {
+                                const { error: insertError } = await this.supabase.from('students').insert([{
+                                    id: user.id,
+                                    nombre: nombre,
+                                    estado: 'Activo'
+                                }]);
+                                if (insertError) {
+                                    console.error("Error crítico insertando student:", insertError);
+                                }
+                            } else if (error) {
+                                console.error("Error consultando student:", error);
+                            }
+                        } else if (rol === 'teacher') {
+                            const { data: cData, error: cError } = await this.supabase.from('teachers').select('id, estado').eq('id', user.id).single();
+                            if (cData) {
+                                this.teacherStatus = cData.estado;
+                            } else {
+                                // Intentar insertar si no existe
+                                const { error: insertError } = await this.supabase.from('teachers').insert([{
+                                    id: user.id,
+                                    email: user.email,
+                                    nombre: nombre,
+                                    estado: 'pendiente'
+                                }]);
+                                if (insertError) {
+                                    console.error("Error crítico insertando teacher:", insertError);
+                                }
+                                this.teacherStatus = 'pendiente'; // Por defecto pendiente
+                            }
+                        }
+                    } catch (err) {
+                        console.error("Error general en checkAndCreateProfile:", err.message);
+                    }
+                },
+
+                async subscribeRealtime() {
+                    if (!this.supabase) return;
+                    try {
+                        if (this.realtimeChannel) {
+                            await this.supabase.removeChannel(this.realtimeChannel);
+                        }
+                        this.realtimeChannel = this.supabase.channel('custom-all-channel')
+                            .on('postgres_changes', { event: '*', schema: 'public', table: 'students' }, payload => this.handleRealtimeChange())
+                            .on('postgres_changes', { event: '*', schema: 'public', table: 'practice_tasks' }, payload => this.handleRealtimeChange())
+                            .on('postgres_changes', { event: '*', schema: 'public', table: 'progress_reports' }, payload => this.handleRealtimeChange())
+                            .on('postgres_changes', { event: '*', schema: 'public', table: 'lessons' }, payload => this.handleRealtimeChange())
+                            .on('postgres_changes', { event: '*', schema: 'public', table: 'teacher_locations' }, payload => this.handleRealtimeChange())
+                            .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, payload => this.handleRealtimeChange())
+                            .on('postgres_changes', { event: '*', schema: 'public', table: 'teachers' }, payload => this.handleRealtimeChange())
+                            .subscribe();
+                    } catch (err) {
+                        console.error("Error suscribiendo a realtime:", err.message);
+                    }
+                },
+
+                async handleRealtimeChange() {
+                    if (this.adminTab === 'students' || this.userRole !== 'admin') {
+                        if (this.fetchStudents) await this.fetchStudents();
+                        if (this.fetchProgress) await this.fetchProgress();
+                        if (this.fetchPayments) await this.fetchPayments();
+                        if (this.fetchLessons) await this.fetchLessons();
+                    } else if (this.adminTab === 'agenda' && this.fetchLessons) {
+                        await this.fetchLessons();
+                    } else if (this.adminTab === 'pagos' && this.fetchPayments) {
+                        await this.fetchPayments();
+                    } else if (this.adminTab === 'teachers' && this.fetchTeachers) {
+                        await this.fetchTeachers();
+                    } else if (this.adminTab === 'usuarios' && this.fetchUsuarios) {
+                        await this.fetchUsuarios();
+                    }
+
+                    if (this.currentStudentId) {
+                        await this.loadStudentContext(this.currentStudentId);
+                    }
+                },
+
+                async loadInitialData() {
+                    try {
+                        // CORRECCIÓN CRÍTICA: Esperar a que fetchStudents termine PRIMERO
+                        // para que las demás consultas puedan filtrar por los IDs de los alumnos.
+                        await this.fetchStudents();
+                        
+                        const promises = [
+                            this.fetchLessons(),
+                            this.fetchProgress(),
+                            this.fetchPayments()
+                        ];
+
+                        if (this.userRole === 'admin') {
+                            promises.push(this.fetchTeachers());
+                            promises.push(this.fetchUsuarios());
+                        }
+                        
+                        await Promise.all(promises);
+                        
+                        if (this.students.length > 0 && !this.currentStudentId) {
+                            this.currentStudentId = this.students[0].id;
+                            await this.loadStudentContext(this.currentStudentId);
+                        }
+                    } catch (err) {
+                        console.error("Error cargando datos iniciales:", err.message);
+                    }
+                },
+
+                async loadStudentContext(studentId) {
+                    if (!this.supabase || !studentId) return;
+                    try {
+                        // Cargar student
+                        const { data: sData, error: sError } = await this.supabase.from('students').select('*').eq('id', studentId).single();
+                        if (!sError && sData) this.currentStudent = sData;
+
+                        // Cargar practice_tasks
+                        const { data: ptData, error: ptError } = await this.supabase.from('practice_tasks').select('*').eq('student_id', studentId);
+                        if (!ptError && ptData) this.currentPracticeTasks = ptData;
+
+                        // Cargar progress_reports (el más reciente)
+                        const { data: prData, error: prError } = await this.supabase.from('progress_reports').select('*').eq('student_id', studentId).order('created_at', { ascending: false }).limit(1);
+                        if (!prError && prData && prData.length > 0) {
+                            this.currentProgress = prData[0];
+                        } else {
+                            this.currentProgress = null;
+                        }
+
+                        // Cargar lessons
+                        let { data: lData, error: lError } = await this.supabase.from('lessons').select('*').eq('student_id', studentId).order('created_at', { ascending: false }).limit(1);
+                        if (lError || !lData || lData.length === 0) {
+                            const { data: lDataFallback, error: lErrorFallback } = await this.supabase.from('lessons').select('*').order('created_at', { ascending: false }).limit(1);
+                            if (!lErrorFallback && lDataFallback && lDataFallback.length > 0) {
+                                this.currentLesson = lDataFallback[0];
+                            } else {
+                                this.currentLesson = null;
+                            }
+                        } else {
+                            this.currentLesson = lData[0];
+                        }
+                    } catch (err) {
+                        console.error("Error cargando contexto del alumno:", err.message);
+                    }
+                },
+
+                openWhatsApp(mensaje) {
+                    const url = `https://wa.me/${this.WHATSAPP_NUM}?text=${encodeURIComponent(mensaje)}`;
+                    window.open(url, '_blank');
+                },
+
+                async registerUser() {
+                    if (this.registerLoading) return; // Prevenir doble clic
+                    this.registerLoading = true;
+                    this.registerError = '';
+                    try {
+                        if (!this.supabase) throw new Error('Base de datos no configurada.');
+                        if (this.registerData.password !== this.registerData.confirmPassword) {
+                            throw new Error('Las contraseñas no coinciden.');
+                        }
+                        
+                        const { data, error } = await this.supabase.auth.signUp({
+                            email: this.registerData.email,
+                            password: this.registerData.password,
+                            options: {
+                                data: {
+                                    nombre: this.registerData.nombre,
+                                    role: this.registerData.role
+                                }
+                            }
+                        });
+                        
+                        if (error) {
+                            if (error.status === 429) throw new Error('Demasiados intentos. Por favor, espera unos minutos.');
+                            throw error;
+                        }
+                        
+                        this.sendEmailNotification('nuevo_registro', { email: this.registerData.email, role: this.registerData.role });
+                        alert('Registro exitoso. Iniciando sesión automáticamente...');
+                        this.showRegisterModal = false;
+                        
+                        // Auto login
+                        this.loginEmail = this.registerData.email;
+                        this.loginPassword = this.registerData.password;
+                        await this.login();
+                        
+                    } catch (err) {
+                        console.error("Error en registerUser:", err);
+                        this.registerError = err.message;
+                    } finally {
+                        this.registerLoading = false;
+                    }
+                },
+
+                async login() {
+                    if (this.loginLoading) return; // Prevenir doble clic
+                    this.loginLoading = true;
+                    this.loginError = '';
+                    
+                    try {
+                        if (!this.supabase) {
+                            throw new Error('El sistema de base de datos no está configurado.');
+                        }
+
+                        const { data, error } = await this.supabase.auth.signInWithPassword({
+                            email: this.loginEmail,
+                            password: this.loginPassword
+                        });
+                        
+                        if (error) {
+                            if (error.status === 429) throw new Error('Demasiados intentos. Por favor, espera unos minutos.');
+                            throw error;
+                        }
+
+                        this.showLoginModal = false;
+                        await this.processLogin(data.user);
+                        
+                    } catch (err) {
+                        this.loginError = err.message || 'Credenciales incorrectas o error de conexión.';
+                    } finally {
+                        this.loginLoading = false;
+                    }
+                },
+
+                clearLocalState() {
+                    this.isAuthenticated = false;
+                    this.userRole = null;
+                    this.userEmail = null;
+                    this.userId = null;
+                    this.userName = null;
+                    this.teacherStatus = null;
+                    this.loginEmail = '';
+                    this.loginPassword = '';
+                    this.students = [];
+                    this.lessons = [];
+                    this.progress_reports = [];
+                    this.payments = [];
+                    this.teachers = [];
+                    this.usuarios = [];
+                    this.currentStudentId = null;
+                    this.currentStudent = null;
+                    this.currentLesson = null;
+                    this.currentProgress = null;
+                    this.currentPracticeTasks = [];
+                    this.progresoIA = '';
+                    this.adminTab = 'students';
+                    this.searchUsuario = '';
+                    this.filterUsuario = 'todos';
+                    this.stopGps();
+                    this.view = 'landing';
+                },
+
+                async logout() {
+                    try {
+                        if (this.realtimeChannel) {
+                            await this.supabase.removeChannel(this.realtimeChannel);
+                        }
+                        if (this.supabase) {
+                            await this.supabase.auth.signOut();
+                        }
+                    } catch (err) {
+                        console.error("Error al cerrar sesión:", err.message);
+                    } finally {
+                        this.clearLocalState();
+                    }
+                },
+
+                // --- REGISTRO DE LEADS (LANDING) ---
+                async registerLead() {
+                    if (!this.supabase) return;
+                    if (!this.newLead.nombre || !this.newLead.telefono || !this.newLead.servicio) {
+                        alert("Por favor completa todos los campos.");
+                        return;
+                    }
+                    this.savingLead = true;
+                    try {
+                        const { error } = await this.supabase.from('students').insert([{
+                            nombre: this.newLead.nombre,
+                            instrumento: this.newLead.servicio,
+                            telefono: this.newLead.telefono,
+                            estado: 'Prospecto'
+                        }]);
+                        
+                        if (error) throw error;
+
+                        const msg = `Hola, soy ${this.newLead.nombre}. Deseo agendar una evaluación para el servicio de ${this.newLead.servicio}. Mi teléfono es ${this.newLead.telefono}.`;
+                        this.openWhatsApp(msg);
+
+                        this.showLeadModal = false;
+                        this.newLead = { nombre: '', telefono: '', servicio: '' };
+                    } catch (err) {
+                        console.error("Error registrando lead:", err.message);
+                        alert("Hubo un error al enviar la solicitud.");
+                    } finally {
+                        this.savingLead = false;
+                    }
+                },
+
+                // --- CRUD ALUMNOS (STUDENTS) (Con filtrado por Rol) ---
+                async fetchStudents() {
+                    if (!this.supabase) return;
+                    try {
+                        let query = this.supabase.from('students').select('*').order('created_at', { ascending: false });
+                        
+                        // Filtrado RLS Frontend usando columnas reales
+                        if (this.userRole === 'student') {
+                            query = query.eq('id', this.userId);
+                        } else if (this.userRole === 'teacher') {
+                            query = query.eq('teacher_id', this.userName);
+                        }
+                            
+                        const { data, error } = await query;
+                        if (error) {
+                            console.error("Error crítico en fetchStudents:", error);
+                            throw error;
+                        }
+                        if (data) {
+                            this.students = data;
+                            if ((this.userRole === 'student' || this.userRole === 'teacher' || this.userRole === 'admin') && this.students.length > 0 && !this.currentStudentId) {
+                                this.currentStudentId = this.students[0].id;
+                                await this.loadStudentContext(this.currentStudentId);
+                            }
+                        }
+                    } catch (err) {
+                        console.error("Error obteniendo students:", err.message);
+                    }
+                },
+
+                async addStudent() {
+                    this.savingStudent = true;
+                    try {
+                        if (!this.supabase) throw new Error("Supabase no conectado.");
+                        
+                        const { data, error } = await this.supabase.from('students').insert([{
+                            nombre: this.newStudent.nombre,
+                            teacher_id: this.newStudent.teacher_id,
+                            instrumento: this.newStudent.instrumento,
+                            nivel: this.newStudent.nivel,
+                            estado: 'En Curso'
+                        }]).select();
+                        
+                        if (error) {
+                            console.error("Error crítico insertando student:", error);
+                            throw error;
+                        }
+                        if (data) {
+                            this.students.unshift(data[0]);
+                            this.sendEmailNotification('nuevo_alumno', { nombre: this.newStudent.nombre });
+                            if (!this.currentStudentId) {
+                                this.currentStudentId = data[0].id;
+                                await this.loadStudentContext(this.currentStudentId);
+                            }
+                        }
+                    } catch (err) {
+                        console.error("Error guardando student:", err.message);
+                        alert("Hubo un error al guardar el alumno: " + err.message);
+                    } finally {
+                        this.showNewStudentModal = false;
+                        this.newStudent = { nombre: '', teacher_id: '', instrumento: '', nivel: '' };
+                        this.savingStudent = false;
+                    }
+                },
+
+                async updateStudent(id, updateData) {
+                    try {
+                        if (!this.supabase) throw new Error("Supabase no conectado.");
+                        const { data, error } = await this.supabase
+                            .from('students')
+                            .update(updateData)
+                            .eq('id', id)
+                            .select();
+                            
+                        if (error) throw error;
+                        await this.fetchStudents();
+                    } catch (err) {
+                        console.error("Error actualizando student:", err.message);
+                    }
+                },
+
+                async deleteStudent(id) {
+                    try {
+                        if (!this.supabase) throw new Error("Supabase no conectado.");
+                        const { error } = await this.supabase
+                            .from('students')
+                            .delete()
+                            .eq('id', id);
+                            
+                        if (error) throw error;
+                        this.students = this.students.filter(s => s.id !== id);
+                    } catch (err) {
+                        console.error("Error eliminando student:", err.message);
+                    }
+                },
+
+                // --- LECTURA DE OTRAS TABLAS (Con filtrado por Rol) ---
+                async fetchLessons() {
+                    if (!this.supabase) return;
+                    try {
+                        let query = this.supabase.from('lessons').select('*').order('created_at', { ascending: false });
+                        
+                        if (this.userRole !== 'admin' && this.students.length > 0) {
+                            const studentIds = this.students.map(s => s.id);
+                            query = query.in('student_id', studentIds);
+                        } else if (this.userRole !== 'admin' && this.students.length === 0) {
+                            this.lessons = [];
+                            return;
+                        }
+
+                        const { data, error } = await query;
+                        if (error) throw error;
+                        if (data) this.lessons = data;
+                    } catch (err) {
+                        console.error("Error obteniendo lessons:", err.message);
+                    }
+                },
+
+                async fetchProgress() {
+                    if (!this.supabase) return;
+                    try {
+                        let query = this.supabase.from('progress_reports').select('*');
+                        
+                        if (this.userRole !== 'admin' && this.students.length > 0) {
+                            const studentIds = this.students.map(s => s.id);
+                            query = query.in('student_id', studentIds);
+                        } else if (this.userRole !== 'admin' && this.students.length === 0) {
+                            this.progress_reports = [];
+                            return;
+                        }
+
+                        const { data, error } = await query;
+                        if (error) throw error;
+                        if (data) this.progress_reports = data;
+                    } catch (err) {
+                        console.error("Error obteniendo progress_reports:", err.message);
+                    }
+                },
+
+                async fetchPayments() {
+                    if (!this.supabase) return;
+                    try {
+                        let query = this.supabase.from('payments').select('*').order('id', { ascending: false });
+                        
+                        if (this.userRole !== 'admin' && this.students.length > 0) {
+                            const studentIds = this.students.map(s => s.id);
+                            query = query.in('student_id', studentIds);
+                        } else if (this.userRole !== 'admin' && this.students.length === 0) {
+                            this.payments = [];
+                            return;
+                        }
+
+                        const { data, error } = await query;
+                        if (error) throw error;
+                        if (data) this.payments = data;
+                    } catch (err) {
+                        console.error("Error obteniendo payments:", err.message);
+                    }
+                },
+
+                // --- GESTIÓN DE PROFESORES (TEACHERS) (ADMIN) ---
+                async fetchTeachers() {
+                    if (!this.supabase) return;
+                    try {
+                        const { data, error } = await this.supabase.from('teachers').select('*').order('created_at', { ascending: false });
+                        if (error) throw error;
+                        if (data) this.teachers = data;
+                    } catch (err) {
+                        console.error("Error obteniendo teachers:", err.message);
+                    }
+                },
+
+                async updateTeacherStatus(id, status) {
+                    if (!this.supabase) return;
+                    try {
+                        const { error } = await this.supabase.from('teachers').update({ estado: status }).eq('id', id);
+                        if (error) throw error;
+                        if (status === 'aprobado') this.sendEmailNotification('profesor_aprobado', { id });
+                        await this.fetchTeachers();
+                        if (this.adminTab === 'usuarios') await this.fetchUsuarios();
+                    } catch (err) {
+                        console.error("Error actualizando estado de teacher:", err.message);
+                    }
+                },
+
+                deleteUserAlert() {
+                    alert("Para eliminar permanentemente un usuario de Supabase Auth por razones de seguridad, se requiere ejecutar esta acción desde el backend (Edge Functions) usando la Service Role Key. Actualmente, el sistema permite 'Desactivar' al profesor para revocar su acceso.");
+                },
+
+                // --- ADMINISTRACIÓN DE USUARIOS (CORREGIDO) ---
+                async fetchUsuarios() {
+                    if (!this.supabase) return;
+                    try {
+                        // Asegurar que tenemos los datos más recientes de las fuentes reales
+                        await this.fetchStudents();
+                        await this.fetchTeachers();
+
+                        let merged = [];
+                        
+                        // 1. Teachers (Fuente real: tabla teachers)
+                        if (this.teachers) {
+                            this.teachers.forEach(c => {
+                                merged.push({
+                                    id: c.id,
+                                    email: c.email,
+                                    nombre: c.nombre,
+                                    rol: 'teacher',
+                                    estado: c.estado || 'pendiente',
+                                    created_at: c.created_at
+                                });
+                            });
+                        }
+
+                        // 2. Students (Fuente real: tabla students)
+                        if (this.students) {
+                            this.students.forEach(s => {
+                                merged.push({
+                                    id: s.id,
+                                    email: s.email || 'Sin email',
+                                    nombre: s.nombre, // Nombre del alumno asociado
+                                    rol: 'student',
+                                    estado: s.estado || 'Activo',
+                                    created_at: s.created_at
+                                });
+                            });
+                        }
+                        
+                        this.usuarios = merged;
+                    } catch (err) {
+                        console.error("Error obteniendo usuarios:", err.message);
+                    }
+                },
+
+                get filteredUsuarios() {
+                    return this.usuarios.filter(u => {
+                        const matchesSearch = (u.nombre?.toLowerCase() || '').includes(this.searchUsuario.toLowerCase()) || 
+                                              (u.email?.toLowerCase() || '').includes(this.searchUsuario.toLowerCase());
+                        if (!matchesSearch) return false;
+
+                        if (this.filterUsuario === 'todos') return true;
+                        if (this.filterUsuario === 'students') return u.rol === 'student';
+                        if (this.filterUsuario === 'teachers') return u.rol === 'teacher';
+                        if (this.filterUsuario === 'pendientes') return u.rol === 'teacher' && u.estado === 'pendiente';
+                        if (this.filterUsuario === 'aprobadas') return u.rol === 'teacher' && u.estado === 'aprobado';
+                        if (this.filterUsuario === 'rechazadas') return u.rol === 'teacher' && u.estado === 'rechazado';
+                        if (this.filterUsuario === 'inactivas') return (u.rol === 'teacher' && u.estado === 'inactivo') || (u.rol === 'student' && u.estado === 'Inactivo');
+                        
+                        return true;
+                    });
+                },
+
+                verUsuario(usuario) {
+                    alert(`Detalles del Usuario:\n\nNombre: ${usuario.nombre}\nEmail: ${usuario.email}\nTipo: ${usuario.rol === 'student' ? 'Alumno' : 'Profesor'}\nEstado: ${usuario.estado}\nFecha de Registro: ${this.formatDate(usuario.created_at)}`);
+                },
+
+                async desactivarUsuario(usuario) {
+                    if (usuario.rol === 'teacher') {
+                        await this.updateTeacherStatus(usuario.id, 'inactivo');
+                    } else if (usuario.rol === 'student') {
+                        await this.updateStudent(usuario.id, { estado: 'Inactivo' });
+                        await this.fetchUsuarios();
+                    }
+                },
+
+                async reactivarUsuario(usuario) {
+                    if (usuario.rol === 'teacher') {
+                        await this.updateTeacherStatus(usuario.id, 'pendiente');
+                    } else if (usuario.rol === 'student') {
+                        await this.updateStudent(usuario.id, { estado: 'En Curso' });
+                        await this.fetchUsuarios();
+                    }
+                },
+
+                async deleteUsuario(id, rol, email) {
+                    if (!confirm("Esta acción eliminará permanentemente el usuario de la base de datos y de Autenticación. El correo quedará completamente liberado. ¿Desea continuar?")) return;
+                    
+                    if (!this.supabase) return;
+                    try {
+                        let authUserId = id;
+
+                        // 1. Identificar el ID de Auth y limpiar tablas públicas
+                        if (rol === 'student') {
+                            authUserId = id;
+                            await this.supabase.from('students').delete().eq('id', id);
+                        } else if (rol === 'teacher') {
+                            await this.supabase.from('teachers').delete().eq('id', id);
+                        }
+
+                        if (authUserId) {
+                            // 3. Llamar a la Edge Function para eliminar de Supabase Auth
+                            const { data, error } = await this.supabase.functions.invoke('delete-user', {
+                                body: { userId: authUserId }
+                            });
+                            
+                            if (error) {
+                                console.error("Error en Edge Function:", error);
+                                alert("Aviso: Se eliminaron los datos locales, pero la eliminación en Auth falló. Asegúrese de haber desplegado la Edge Function 'delete-user'.");
+                            } else {
+                                alert("Usuario eliminado exitosamente. El correo ha sido liberado y puede volver a registrarse.");
+                            }
+                        } else {
+                            alert("Datos locales eliminados. No se encontró cuenta de Auth vinculada para liberar el correo.");
+                        }
+                        
+                        await this.fetchStudents();
+                        await this.fetchTeachers();
+                        await this.fetchUsuarios();
+                    } catch (err) {
+                        console.error("Error eliminando usuario:", err.message);
+                        alert("Hubo un error al eliminar el usuario: " + err.message);
+                    }
+                },
+
+                // --- OPERACIONES REALES (FASE 3 & 5) ---
+                async startLesson(lessonId) {
+                    if (!this.supabase) return;
+                    try {
+                        if (lessonId) {
+                            const { error } = await this.supabase.from('lessons').update({ estado: 'en curso', hora_inicio: new Date().toLocaleTimeString('es-ES', {hour: '2-digit', minute:'2-digit'}) }).eq('id', lessonId);
+                            if (error) throw error;
+                        } else {
+                            const { error } = await this.supabase.from('lessons').insert([{
+                                student_id: this.currentStudentId,
+                                teacher_id: this.userId,
+                                fecha: new Date().toLocaleDateString('es-ES'),
+                                hora_inicio: new Date().toLocaleTimeString('es-ES', {hour: '2-digit', minute:'2-digit'}),
+                                estado: 'en curso'
+                            }]);
+                            if (error) throw error;
+                        }
+                        await this.loadStudentContext(this.currentStudentId);
+                    } catch (err) {
+                        console.error("Error iniciando clase:", err.message);
+                    }
+                },
+
+                async endLesson(lessonId) {
+                    if (!this.supabase || !lessonId) return;
+                    try {
+                        const { error } = await this.supabase.from('lessons').update({ estado: 'finalizada', hora_fin: new Date().toLocaleTimeString('es-ES', {hour: '2-digit', minute:'2-digit'}) }).eq('id', lessonId);
+                        if (error) throw error;
+                        await this.loadStudentContext(this.currentStudentId);
+                    } catch (err) {
+                        console.error("Error finalizando clase:", err.message);
+                    }
+                },
+
+                async createProgressReport(studentId) {
+                    if (!this.supabase || !studentId || !this.progresoIA?.trim()) return;
+                    this.aiGenerating = true;
+                    try {
+                        const { error } = await this.supabase.from('progress_reports').insert([{
+                            student_id: studentId,
+                            teacher_id: this.userId,
+                            contenido: this.progresoIA,
+                            created_at: new Date().toISOString()
+                        }]);
+                        if (error) throw error;
+                        
+                        this.progresoIA = '';
+                        this.aiDone = true;
+                        this.sendEmailNotification('nuevo_registro_progreso', { studentId: studentId });
+                        setTimeout(() => { this.aiDone = false; }, 3000);
+                        
+                        await this.loadStudentContext(studentId);
+                        if (this.fetchProgress) await this.fetchProgress();
+                    } catch (err) {
+                        console.error("Error guardando registro:", err.message);
+                    } finally {
+                        this.aiGenerating = false;
+                    }
+                },
+
+                async assignPracticeTask(studentId, titulo = 'Práctica General', descripcion = 'Practicar lo visto en clase', fecha_entrega = 'Próxima clase') {
+                    if (!this.supabase || !studentId) return;
+                    try {
+                        const { error } = await this.supabase.from('practice_tasks').insert([{
+                            student_id: studentId,
+                            titulo: titulo,
+                            descripcion: descripcion,
+                            estado: false,
+                            fecha_entrega: fecha_entrega,
+                            created_at: new Date().toISOString()
+                        }]);
+                        if (error) throw error;
+                        this.sendEmailNotification('tarea_asignada', { studentId: studentId });
+                        await this.loadStudentContext(studentId);
+                    } catch (err) {
+                        console.error("Error asignando tarea:", err.message);
+                    }
+                },
+
+                async togglePracticeTask(id, estado) {
+                    if (!this.supabase) return;
+                    try {
+                        const { error } = await this.supabase.from('practice_tasks').update({ estado: estado }).eq('id', id);
+                        if (error) throw error;
+                        await this.loadStudentContext(this.currentStudentId);
+                    } catch (err) {
+                        console.error("Error actualizando tarea:", err.message);
+                    }
+                },
+
+                // --- ACTIVIDAD RECIENTE ---
+                getActividadReciente() {
+                    let actividades = [];
+                    
+                    (this.progress_reports || []).forEach(report => {
+                        actividades.push({
+                            id: report.id,
+                            tipo: 'progress_report',
+                            titulo: 'Nuevas Notas de Clase',
+                            descripcion: report.contenido ? (report.contenido.substring(0, 60) + '...') : 'Registro guardado',
+                            fecha: report.created_at || new Date().toISOString()
+                        });
+                    });
+
+                    (this.payments || []).forEach(pago => {
+                        actividades.push({
+                            id: pago.id,
+                            tipo: 'pago',
+                            titulo: 'Pago Registrado',
+                            descripcion: `Monto: $${pago.monto} - Método: ${pago.metodo || 'N/A'}`,
+                            fecha: pago.created_at || new Date().toISOString()
+                        });
+                    });
+
+                    (this.lessons || []).forEach(lesson => {
+                        actividades.push({
+                            id: lesson.id,
+                            tipo: 'lesson',
+                            titulo: `Clase: ${lesson.estado || 'Registrada'}`,
+                            descripcion: `Fecha: ${lesson.fecha || 'N/A'} | Horario: ${lesson.hora_inicio || ''} - ${lesson.hora_fin || ''}`,
+                            fecha: lesson.created_at || new Date().toISOString()
+                        });
+                    });
+
+                    actividades.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+                    return actividades.slice(0, 10);
+                },
+
+                formatDate(dateString) {
+                    if (!dateString) return '';
+                    const d = new Date(dateString);
+                    return d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute:'2-digit' });
+                },
+
+                // --- FUNCIONES OPERATIVAS ---
+                stopGps() {
+                    if (this.gpsWatchId !== null) {
+                        navigator.geolocation.clearWatch(this.gpsWatchId);
+                        this.gpsWatchId = null;
+                    }
+                    this.gpsActive = false;
+                },
+
+                toggleGps(studentId) {
+                    if (!this.supabase) {
+                        alert("Conecta Supabase primero para usar el GPS.");
+                        return;
+                    }
+                    if (!studentId) {
+                        alert("Error: No hay un alumno seleccionado.");
+                        return;
+                    }
+
+                    if (this.gpsActive) {
+                        this.stopGps();
+                    } else {
+                        if (navigator.geolocation) {
+                            this.gpsActive = true;
+                            this.gpsWatchId = navigator.geolocation.watchPosition(async (position) => {
+                                try {
+                                    if (Date.now() - this.lastGpsUpdate < 30000) {
+                                        return;
+                                    }
+
+                                    const lat = position.coords.latitude;
+                                    const lng = position.coords.longitude;
+                                    
+                                    const { error: err1 } = await this.supabase.from('students').update({ lat, lng }).eq('id', studentId);
+                                    if (err1) throw err1;
+
+                                    const { error: err2 } = await this.supabase.from('teacher_locations').insert([{
+                                        student_id: studentId,
+                                        lat: lat,
+                                        lng: lng,
+                                        timestamp: new Date().toISOString()
+                                    }]);
+                                    if (err2) throw err2;
+
+                                    this.lastGpsUpdate = Date.now();
+                                    
+                                    if (this.view === 'admin' && this.adminTab === 'students') this.fetchStudents();
+                                } catch (err) {
+                                    console.error("Error actualizando GPS:", err.message);
+                                }
+                            }, (error) => {
+                                console.error("Error GPS:", error.message);
+                                this.stopGps();
+                                alert("Por favor, permite el acceso a la localización.");
+                            }, { enableHighAccuracy: true });
+                        } else {
+                            alert("Tu dispositivo no soporta geolocalización.");
+                        }
+                    }
+                },
+
+                payService(studentId) {
+                    if (!this.supabase) {
+                        alert("Conecta Supabase primero para procesar pagos.");
+                        return;
+                    }
+                    if (!studentId) {
+                        alert("Error: No hay un alumno seleccionado para el pago.");
+                        return;
+                    }
+
+                    window.open(this.LINK_PAGO_DIRECTO, '_blank');
+                    
+                    setTimeout(async () => {
+                        try {
+                            const { error } = await this.supabase.from('students').update({ estado: 'Pagado/Activo' }).eq('id', studentId);
+                            if (error) throw error;
+                            
+                            this.sendEmailNotification('pago_recibido', { studentId });
+                            if (this.view === 'admin' && this.adminTab === 'students') this.fetchStudents();
+                        } catch (err) {
+                            console.error("Error actualizando estado de pago:", err.message);
+                        }
+                    }, 5000);
+                }
+            }
+        }
+    </script>
+</body>
