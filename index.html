@@ -432,16 +432,16 @@
                             <i class="ph-fill ph-star text-2xl"></i>
                         </div>
                         <h3 class="text-slate-500 text-sm font-medium">Satisfacción</h3>
-                        <p class="text-3xl font-bold text-slate-900 mt-1">4.9/5</p>
-                        <p class="text-sage-dark text-sm mt-2 font-medium">Basado en 50 reviews</p>
+                        <p class="text-3xl font-bold text-slate-900 mt-1">--</p>
+                        <p class="text-sage-dark text-sm mt-2 font-medium">No hay valoraciones registradas</p>
                     </div>
                     <div class="bg-white p-6 rounded-3xl shadow-soft border border-slate-100">
                         <div class="w-12 h-12 rounded-2xl bg-[#1A4BFF]/10 text-medical-blue flex items-center justify-center mb-4">
                             <i class="ph-fill ph-currency-dollar text-2xl"></i>
                         </div>
-                        <h3 class="text-slate-500 text-sm font-medium">Facturación (Mes)</h3>
-                        <p class="text-3xl font-bold text-slate-900 mt-1">$8,450</p>
-                        <p class="text-sage-dark text-sm mt-2 font-medium flex items-center gap-1"><i class="ph ph-trend-up"></i> +12% vs mes anterior</p>
+                        <h3 class="text-slate-500 text-sm font-medium">Facturación (Total)</h3>
+                        <p class="text-3xl font-bold text-slate-900 mt-1" x-text="'$' + payments.reduce((acc, p) => acc + (Number(p.monto) || 0), 0)"></p>
+                        <p class="text-sage-dark text-sm mt-2 font-medium flex items-center gap-1">Total histórico</p>
                     </div>
                 </div>
 
@@ -774,7 +774,7 @@
             <div class="bg-medical-blue text-white p-6 pt-12 rounded-b-[2.5rem] shadow-md relative z-10">
                 <div class="flex justify-between items-center mb-4">
                     <div>
-                        <p class="text-medical-light/80 text-sm font-medium">Hola, <span x-text="currentStudent?.nombre || 'Alumno'"></span></p>
+                        <p class="text-medical-light/80 text-sm font-medium">Hola, <span x-text="currentStudent?.nombre || 'Usuario'"></span></p>
                         <h2 class="text-2xl font-bold">Portal Alumno</h2>
                     </div>
                     <div class="flex gap-2">
@@ -801,9 +801,9 @@
                         <div class="absolute bottom-0 right-0 w-4 h-4 bg-sage-dark border-2 border-white rounded-full"></div>
                     </div>
                     <div>
-                        <p class="text-[10px] text-sage-dark font-bold uppercase tracking-wider mb-0.5">En este momento</p>
-                        <p class="font-bold text-sm leading-tight"><span x-text="currentStudent?.teacher_id || 'El profesor'"></span> está con <span x-text="currentStudent?.nombre || 'el alumno'"></span>.</p>
-                        <p class="text-xs text-slate-500 mt-1 flex items-center gap-1"><i class="ph ph-clock"></i> Llegó a las <span x-text="currentLesson?.hora_inicio || '08:00 AM'"></span></p>
+                        <p class="text-[10px] text-sage-dark font-bold uppercase tracking-wider mb-0.5" x-text="currentLesson?.estado === 'en curso' ? 'Clase en curso' : 'Estado'"></p>
+                        <p class="font-bold text-sm leading-tight" x-text="currentLesson?.estado === 'en curso' ? ((currentStudent?.teacher_id || 'Tu profesor') + ' está contigo.') : 'No tienes clases activas en este momento.'"></p>
+                        <p class="text-xs text-slate-500 mt-1 flex items-center gap-1" x-show="currentLesson?.estado === 'en curso'"><i class="ph ph-clock"></i> Inició a las <span x-text="currentLesson?.hora_inicio"></span></p>
                     </div>
                 </div>
             </div>
@@ -834,9 +834,9 @@
                                 <div class="w-12 h-12 bg-[#1A4BFF]/10 text-medical-blue rounded-full flex items-center justify-center mx-auto mb-3 border border-[#1A4BFF]/20">
                                     <i class="ph-fill ph-hourglass-medium text-2xl animate-pulse"></i>
                                 </div>
-                                <p class="font-bold text-slate-800 text-sm mb-2">Notas en proceso de actualización</p>
+                                <p class="font-bold text-slate-800 text-sm mb-2">Sin reportes</p>
                                 <p class="text-xs text-slate-600 leading-relaxed">
-                                    Bienvenido a tu centro de progreso musical. Los ejercicios, técnica y repertorio están siendo registrados por tu instructor. En breves instantes visualizarás aquí la evolución de tu clase y las tareas asignadas.
+                                    Todavía no hay reportes de progreso registrados.
                                 </p>
                             </div>
                         </div>
@@ -862,7 +862,7 @@
                                 <i x-show="!task.estado" class="ph ph-clock text-slate-400 text-2xl"></i>
                             </div>
                         </template>
-                        <div x-show="!currentPracticeTasks || currentPracticeTasks.length === 0" class="text-sm text-slate-500 text-center py-2">No hay tareas de práctica registradas.</div>
+                        <div x-show="!currentPracticeTasks || currentPracticeTasks.length === 0" class="text-sm text-slate-500 text-center py-2">No tienes tareas de práctica asignadas.</div>
                     </div>
                 </div>
             </div>
@@ -897,7 +897,7 @@
                 <div class="flex justify-between items-start mb-2">
                     <div>
                         <p class="text-medical-light/80 text-sm font-medium">Clase Actual</p>
-                        <h1 class="text-2xl font-bold mt-1" x-text="currentStudent?.nombre || 'Alumno'"></h1>
+                        <h1 class="text-2xl font-bold mt-1" x-text="currentStudent?.nombre || 'Sin alumno seleccionado'"></h1>
                     </div>
                     <button @click="logout" class="w-10 h-10 rounded-full bg-red-500/20 text-red-100 flex items-center justify-center backdrop-blur-sm hover:bg-red-500/40 transition" title="Cerrar Sesión">
                         <i class="ph ph-sign-out text-xl"></i>
@@ -912,7 +912,7 @@
                 </select>
 
                 <div class="flex items-center gap-2 mt-4 text-sm bg-white/10 w-max px-4 py-2 rounded-full backdrop-blur-sm">
-                    <i class="ph ph-clock"></i> <span x-text="(currentLesson?.hora_inicio || '08:00') + ' - ' + (currentLesson?.hora_fin || '16:00')"></span>
+                    <i class="ph ph-clock"></i> <span x-text="currentLesson ? (currentLesson.hora_inicio || '--:--') + ' - ' + (currentLesson.hora_fin || '--:--') : 'Sin horario registrado'"></span>
                 </div>
             </div>
 
@@ -947,7 +947,7 @@
                             <input type="checkbox" :checked="task.estado" @change="togglePracticeTask(task.id, $event.target.checked)" class="w-6 h-6 rounded-full text-sage-dark focus:ring-sage-dark border-slate-300" />
                         </div>
                     </template>
-                    <div x-show="!currentPracticeTasks || currentPracticeTasks.length === 0" class="text-sm text-slate-500 text-center py-2">No hay tareas asignadas.</div>
+                    <div x-show="!currentPracticeTasks || currentPracticeTasks.length === 0" class="text-sm text-slate-500 text-center py-2">No tienes tareas de práctica asignadas.</div>
                 </div>
 
                 <!-- Registro Rápido IA -->
@@ -959,7 +959,7 @@
                         x-model="progresoIA"
                         class="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-medical-light resize-none"
                         rows="4"
-                        placeholder="Ej: Excelente progreso en técnica de escalas. Se revisó repertorio clásico. Tarea: Practicar compases 15-30 con metrónomo a 80bpm."
+                        placeholder="Escribe aquí el progreso técnico, repertorio revisado y observaciones de la sesión..."
                     ></textarea>
                     
                     <button 
